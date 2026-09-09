@@ -1,8 +1,8 @@
 {
-  "projects": { "default": "cfb-schedule-grid-a4f21" },
+  "projects": { "default": "cfb-schedule-grid" },
   "targets": {
-    "cfb-schedule-grid-a4f21": {
-      "hosting": { "cfb": ["cfb-schedule-grid-a4f21"] }
+    "cfb-schedule-grid": {
+      "hosting": { "cfb": ["cfb-schedule-grid"] }
     }
   }
 }
