@@ -1,0 +1,5 @@
+# build.py is standard library only on macOS and Linux — nothing to install.
+#
+# Windows has no IANA time zone database, so zoneinfo needs this package.
+# Harmless to install anywhere; the marker just makes it a no-op elsewhere.
+tzdata; sys_platform == "win32"
