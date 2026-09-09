@@ -226,7 +226,16 @@
   .wk:hover{border-color:var(--accent);color:var(--ink)}
   .wk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .wk[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#06182c}
-  .stamp{font-size:11px;color:var(--ink-dim);padding:0 0 16px}
+  .stamp{font-size:11px;color:var(--ink-dim);padding:0 0 16px;
+         display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .tz{
+    font-family:"Barlow",sans-serif;font-size:11px;font-weight:600;
+    background:none;border:1px solid var(--board-line-strong);
+    color:var(--ink-dim);border-radius:999px;padding:3px 9px;cursor:pointer;
+  }
+  .tz:hover{border-color:var(--accent);color:var(--ink)}
+  .tz:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .tick .dayx{display:block;font-size:8px;color:var(--accent);font-weight:700}
   .stamp.stale{color:#ffb454}
 </style>
 </head>
@@ -236,7 +245,7 @@
   <div class="masthead">
     <h1>College football TV schedule<span id="subtitle"></span></h1>
     <div class="meta">
-      All kickoff times <b>Eastern</b>.<br>
+      Kickoff times in <b id="zonename">your local time</b>.<br>
       Rankings from the <b>AP Top 25</b>.<br>
       Networks and windows are subject to change.
     </div>
@@ -277,22 +286,85 @@ const streamEl= document.getElementById("stream");
 let weekIdx = 0;
 let conf    = "ALL";
 
+/* Times arrive as ISO instants. The grid geometry is fixed at build time in
+   Eastern, but the labels are formatted for whoever is looking — a viewer in
+   Denver should not have to subtract two hours in their head. "ET" stays
+   available because that is how kickoffs are quoted everywhere else. */
+const ET_ZONE = "America/New_York";
+const LOCAL   = Intl.DateTimeFormat().resolvedOptions().timeZone || ET_ZONE;
+let useLocal  = true;
+try {
+  const v = localStorage.getItem("cfb.tz");
+  if (v) useLocal = v === "local";
+} catch (e) {}
+
+function zone(){ return useLocal ? LOCAL : ET_ZONE; }
+
+function fmtTime(iso){
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone(), hour: "numeric", minute: "2-digit", hour12: true
+  }).formatToParts(new Date(iso));
+  const get = t => (parts.find(p => p.type === t) || {}).value || "";
+  return [`${get("hour")}:${get("minute")}`, get("dayPeriod")];
+}
+
+/* Weekday in the display zone, so a viewer far enough east sees when a late
+   kickoff has slid past midnight into Sunday. */
+function fmtDay(iso){
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: zone(), weekday: "short"
+  }).format(new Date(iso));
+}
+
+function zoneLabel(){
+  const p = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone(), timeZoneName: "short"
+  }).formatToParts(new Date());
+  return (p.find(x => x.type === "timeZoneName") || {}).value || "";
+}
+
 /* Remember the chosen conference between visits. Private to this browser and
    entirely optional — if storage is blocked, the page just defaults to All. */
 try { conf = localStorage.getItem("cfb.conf") || "ALL"; } catch (e) {}
 
 /* ---- build-time stamp, so a failed rebuild is visible ---- */
-(function stamp(){
-  const el = document.getElementById("stamp");
-  const t  = new Date(DOC.generated);
+const stampEl = document.getElementById("stamp");
+
+function drawStamp(){
+  const t = new Date(DOC.generated);
   const days = (Date.now() - t.getTime()) / 86400000;
-  el.textContent = "Updated " + t.toLocaleString(undefined,
+  let txt = "Updated " + t.toLocaleString(undefined,
     {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
-  if (days > 3){
-    el.classList.add("stale");
-    el.textContent += "  \u00b7  this may be out of date";
+  if (days > 3) txt += "  \u00b7  this may be out of date";
+
+  stampEl.classList.toggle("stale", days > 3);
+  stampEl.innerHTML = "";
+  stampEl.append(txt);
+
+  /* Only offer the toggle when the viewer is not already on Eastern —
+     otherwise it is a button that does nothing. */
+  if (LOCAL !== ET_ZONE){
+    const b = document.createElement("button");
+    b.className = "tz"; b.type = "button";
+    b.textContent = useLocal
+      ? `times in ${zoneLabel()} \u00b7 show ET`
+      : `times in ET \u00b7 show ${new Intl.DateTimeFormat("en-US",
+          {timeZone: LOCAL, timeZoneName: "short"}).formatToParts(new Date())
+          .find(x => x.type === "timeZoneName").value}`;
+    b.addEventListener("click", () => {
+      useLocal = !useLocal;
+      try { localStorage.setItem("cfb.tz", useLocal ? "local" : "et"); } catch (e) {}
+      drawStamp();
+      drawWeek(DOC.weeks[weekIdx]);
+    });
+    stampEl.append(b);
+  } else {
+    const s = document.createElement("span");
+    s.textContent = "\u00b7  times in " + zoneLabel();
+    stampEl.append(s);
   }
-})();
+}
+drawStamp();
 
 /* ---- week tabs ---- */
 const weeksEl = document.getElementById("weeks");
@@ -316,6 +388,7 @@ function showWeek(i){
 /* ---- draw one week ---- */
 function drawWeek(W){
   document.getElementById("subtitle").textContent = W.date_long;
+  document.getElementById("zonename").textContent = zoneLabel();
   document.title = "CFB TV \u2014 " + W.date_long;
 
   grid.innerHTML = "";
@@ -325,11 +398,15 @@ function drawWeek(W){
   th.className = "thead";
   th.innerHTML = `<div class="daycell"><div class="d">Saturday</div>` +
                  `<div class="s">${esc(W.date_short)} \u00b7 AP TOP 25</div></div>`;
+  const baseDay = fmtDay(W.ticks[0].iso);
   for (const t of W.ticks){
+    const [hm, ap] = fmtTime(t.iso);
+    const dy = fmtDay(t.iso);
     const d = document.createElement("div");
     d.className = "tick";
     d.style.gridColumn = `${t.col} / span 2`;
-    d.innerHTML = `${esc(t.time)}<em>${esc(t.ap)}</em>`;
+    d.innerHTML = `${esc(hm)}<em>${esc(ap)}</em>` +
+                  (dy !== baseDay ? `<span class="dayx">${esc(dy)}</span>` : "");
     th.appendChild(d);
   }
   grid.appendChild(th);
@@ -364,7 +441,7 @@ function drawWeek(W){
       el.innerHTML =
         `<div class="side" style="background:${g.away.colour};color:${g.away_ink}">
            ${g.away.rank ? `<span class="rk">#${g.away.rank}</span>` : ""}${esc(g.away.name)}
-           <span class="kick">${esc(g.time)}</span>
+           <span class="kick">${esc(fmtTime(g.iso).join(" "))}</span>
          </div>
          <div class="side" style="background:${g.home.colour};color:${g.home_ink}">
            <span class="at">at</span>${g.home.rank ? `<span class="rk">#${g.home.rank}</span>` : ""}${esc(g.home.name)}
@@ -376,7 +453,7 @@ function drawWeek(W){
 
   streamEl.innerHTML = W.stream.map(s =>
     `<div class="srow" data-conf="${s.conf}">
-       <span class="t">${esc(s.time)}</span>
+       <span class="t">${esc(fmtTime(s.iso)[0])}</span>
        <span class="b ${s.badge}">${esc(s.net)}</span>
        <span class="m">${esc(s.match)}</span>
      </div>`).join("");

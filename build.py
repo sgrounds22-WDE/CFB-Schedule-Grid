@@ -216,8 +216,11 @@ def render_week(games, day):
         "tab": day.strftime("%b ") + str(day.day),
         "cols": cols,
         "span": span,
+        "origin": origin.isoformat(),
         "ticks": [
-            {"col": i + 2, "time": clock(origin + dt.timedelta(minutes=15 * i))[0],
+            {"col": i + 2,
+             "iso": (origin + dt.timedelta(minutes=15 * i)).isoformat(),
+             "time": clock(origin + dt.timedelta(minutes=15 * i))[0],
              "ap": clock(origin + dt.timedelta(minutes=15 * i))[1]}
             for i in range(0, cols, 2)
         ],
@@ -241,6 +244,7 @@ def render_week(games, day):
                     "col": col_of(g["kick"]),
                     "conf": f'|{g["away"]["conf"]}|{g["home"]["conf"]}|',
                     "time": " ".join(clock(g["kick"])),
+                    "iso": g["kick"].isoformat(),
                     "away": g["away"], "home": g["home"],
                     "away_ink": ink(g["away"]["colour"]),
                     "home_ink": ink(g["home"]["colour"]),
@@ -253,6 +257,7 @@ def render_week(games, day):
         t, ap = clock(g["kick"])
         payload["stream"].append({
             "time": t, "ap": ap,
+            "iso": g["kick"].isoformat(),
             "badge": STREAM_BADGES.get(g["net"], "espnplus"),
             "net": g["net"] or "Streaming",
             "conf": f'|{g["away"]["conf"]}|{g["home"]["conf"]}|',
