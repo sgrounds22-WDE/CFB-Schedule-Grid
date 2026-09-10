@@ -47,7 +47,7 @@
     --rail:#0a1c33;
     --accent:#4da6ff;
     --col:25px;
-    --rowh:56px;
+    --rowh:36px;
     --netw:112px;
   }
   *{box-sizing:border-box}
@@ -146,59 +146,185 @@
   .slotline{border-left:1px solid var(--board-line);min-height:var(--rowh)}
   .slotline.half{border-left-color:rgba(255,255,255,.03)}
 
-  /* game blocks */
+  /* ---- game bar: one row, two team colours, stitched at the seam ---- */
   .game{
     align-self:center;
-    margin:4px 2px;
+    position:relative;
+    margin:3px 2px;
+    height:30px;
     border-radius:4px;
     overflow:hidden;
-    display:flex;flex-direction:column;
-    box-shadow:0 1px 0 rgba(0,0,0,.35);
-    z-index:2;
-    min-width:0;
+    display:flex;align-items:stretch;
+    box-shadow:0 1px 0 rgba(0,0,0,.4);
+    z-index:2;min-width:0;
+    /* it is a button, so undo the browser's opinions */
+    padding:0;border:0;font:inherit;color:inherit;text-align:left;
+    cursor:pointer;-webkit-appearance:none;appearance:none;
   }
-  .side{
-    /* The gloss overlay below is absolutely positioned against this box.
-       Without position:relative it resolves against .grid instead and paints
-       one full-grid gradient per game. */
-    position:relative;
-    flex:1;
-    display:flex;align-items:center;
-    padding:0 9px;
-    min-height:23px;
-    font-family:"Barlow Condensed",sans-serif;
-    font-weight:600;font-size:15px;line-height:1;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  }
-  /* Top gloss. A lit upper half falling away to a shaded base, painted as an
-     overlay so it works over any team colour without hard-coding a second
-     shade per team. */
-  .side::after{
-    content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  .game:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .game::after{
+    content:"";position:absolute;inset:0;z-index:6;pointer-events:none;
     background:linear-gradient(180deg,
-      rgba(255,255,255,.30) 0%, rgba(255,255,255,.08) 48%,
-      rgba(0,0,0,.06) 52%, rgba(0,0,0,.16) 100%);
+      rgba(255,255,255,.28) 0%, rgba(255,255,255,.07) 48%,
+      rgba(0,0,0,.05) 52%, rgba(0,0,0,.15) 100%);
   }
-  .side > *{position:relative;z-index:2}
-  .side .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-  /* Record sits with the name; the spread is pushed right, next to the time.
-     Both shrink out of the way before the team name does. */
-  .side .rec{
-    font-family:"Barlow",sans-serif;font-size:9.5px;font-weight:600;
-    opacity:.85;margin-left:4px;flex:0 0 auto;
+  .game .t{
+    position:relative;z-index:3;flex:1 1 50%;
+    display:flex;align-items:center;gap:3px;
+    padding:0 8px;min-width:0;
+    font-family:"Barlow Condensed",sans-serif;
+    font-weight:600;font-size:14.5px;line-height:1;
+    white-space:nowrap;overflow:hidden;
   }
-  .side .sp{
+  .game .t.r{justify-content:flex-end}
+  .game .t.l{padding-left:8px}
+  .game .nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .game .rk{font-size:10px;font-weight:700;opacity:.85;flex:0 0 auto}
+
+  /* The badge sits in a punched hole: a ring of board colour separates it from
+     both halves, so the seam reads as one bar pierced rather than two blocks
+     butted together. */
+  .game .at{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    z-index:5;width:16px;height:16px;border-radius:50%;
+    background:#0b1f38;
+    box-shadow:0 0 0 2.5px var(--board-bg);
+    display:flex;align-items:center;justify-content:center;
+    font-family:"Barlow",sans-serif;font-size:8.5px;font-weight:700;
+    color:rgba(255,255,255,.85);
+  }
+  .game.dim{opacity:.13}
+  .game.hit{outline:2px solid var(--accent);outline-offset:1px}
+
+  /* ---- detail panel ---- */
+  .sheet{
+    position:fixed;inset:0;z-index:60;display:none;
+    align-items:center;justify-content:center;padding:20px;
+    background:rgba(4,12,24,.72);
+  }
+  .sheet.on{display:flex}
+  .card{
+    width:min(430px,100%);background:var(--board-bg);
+    border:1px solid var(--board-line-strong);border-radius:10px;
+    overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.55);
+  }
+  .card .teams{display:flex}
+  .card .tm{
+    flex:1;padding:15px 14px 13px;position:relative;overflow:hidden;
+  }
+  .card .tm::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(0,0,0,.14));
+  }
+  .card .tm > *{position:relative;z-index:2}
+  .card .tm .side-label{
+    font-family:"Barlow",sans-serif;font-size:9px;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;opacity:.7;
+  }
+  .card .tm .name{
+    font-family:"Barlow Condensed",sans-serif;font-weight:700;
+    font-size:22px;line-height:1.05;margin:5px 0 6px;
+  }
+  .card .tm .meta{font-family:"Barlow",sans-serif;font-size:12px;opacity:.9}
+  .card .rows{padding:4px 16px 14px}
+  .card .r{
+    display:flex;justify-content:space-between;gap:14px;
+    padding:9px 0;border-bottom:1px solid var(--board-line);
+    font-size:13.5px;
+  }
+  .card .r:last-child{border-bottom:0}
+  .card .r span:first-child{color:var(--ink-dim)}
+  .card .r span:last-child{font-weight:600;text-align:right}
+  /* tabs */
+  .card .tabs{display:flex;gap:0;background:var(--board-deep);
+              border-bottom:1px solid var(--board-line-strong)}
+  .card .tabs button{
+    flex:1;background:none;border:0;border-bottom:2px solid transparent;
+    color:var(--ink-dim);cursor:pointer;padding:10px 8px 8px;
+    font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;
+    letter-spacing:.03em;
+  }
+  .card .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+  .card .tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .card .pane{display:none}
+  .card .pane.on{display:block}
+
+  /* side-by-side comparison */
+  .cmp{padding:6px 16px 12px}
+  .cmp .cr{
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+    gap:10px;padding:8px 0;border-bottom:1px solid var(--board-line);
+    font-size:13.5px;
+  }
+  .cmp .cr:last-child{border-bottom:0}
+  .cmp .cr .lab{
     font-family:"Barlow",sans-serif;font-size:9.5px;font-weight:700;
-    margin-left:auto;padding-left:6px;flex:0 0 auto;opacity:.9;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);
+    white-space:nowrap;
   }
-  .side .sp + .kick{margin-left:6px;padding-left:0}
-  .side .rk{font-size:11px;font-weight:700;opacity:.82;margin-right:4px}
-  .side .at{opacity:.8;margin-right:4px;font-weight:500}
-  .kick{
-    font-family:"Barlow",sans-serif;
-    font-size:10px;font-weight:700;letter-spacing:.03em;
-    opacity:.92;margin-left:auto;padding-left:8px;
+  .cmp .cr .v{font-weight:600;font-variant-numeric:tabular-nums}
+  .cmp .cr .v.a{text-align:left}
+  .cmp .cr .v.b{text-align:right}
+  .cmp .cr .v.lead{font-weight:500;font-size:12px;line-height:1.3}
+  .cmp .cr .v .who{display:block;font-size:10px;opacity:.65;font-weight:600}
+  .cmp .grp{
+    font-family:"Barlow",sans-serif;font-size:9px;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+    padding:13px 0 3px;border-bottom:1px solid var(--board-line);
   }
+  .cmp .none{padding:16px 0 6px;color:var(--ink-dim);font-size:12.5px;text-align:center}
+
+  /* matchup predictor */
+  .pred{padding:12px 16px 4px}
+  .pred .head{
+    font-family:"Barlow",sans-serif;font-size:9px;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);
+    margin-bottom:9px;
+  }
+  .pred .track{
+    display:flex;height:22px;border-radius:4px;overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+  }
+  .pred .seg{
+    display:flex;align-items:center;position:relative;
+    font-family:"Barlow",sans-serif;font-size:11px;font-weight:700;
+    padding:0 7px;min-width:0;white-space:nowrap;
+  }
+  .pred .seg.b{justify-content:flex-end}
+  .pred .seg::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(0,0,0,.14));
+  }
+  .pred .seg span{position:relative;z-index:2}
+  .pred .who{
+    display:flex;justify-content:space-between;gap:12px;margin-top:6px;
+    font-size:11px;color:var(--ink-dim);
+  }
+  .pred .src{
+    font-size:10px;color:var(--ink-dim);opacity:.75;
+    text-align:center;padding:8px 0 2px;
+  }
+
+  .espn{
+    display:block;margin:2px 16px 14px;padding:9px 12px;border-radius:6px;
+    background:#c8102e;color:#fff;text-decoration:none;text-align:center;
+    font-family:"Barlow",sans-serif;font-size:12.5px;font-weight:700;
+    letter-spacing:.02em;
+  }
+  .espn:hover{background:#e01236}
+  .espn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .card .bar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:11px 16px;background:var(--board-deep);
+  }
+  .card .bar b{font-family:"Barlow Condensed",sans-serif;font-size:17px;font-weight:700}
+  .card .bar button{
+    background:none;border:1px solid var(--board-line-strong);color:var(--ink-dim);
+    border-radius:999px;padding:5px 13px;cursor:pointer;
+    font-family:"Barlow",sans-serif;font-size:12px;font-weight:600;
+  }
+  .card .bar button:hover{border-color:var(--accent);color:var(--ink)}
 
   /* ---- streaming ---- */
   .stream{
@@ -218,16 +344,58 @@
     grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
     gap:4px 26px;
   }
-  .srow{display:flex;align-items:baseline;gap:9px;padding:4px 0;border-bottom:1px solid var(--board-line);font-size:13.5px}
-  .srow .t{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-dim);flex:0 0 44px;font-size:12.5px}
-  .srow .b{flex:0 0 auto;font-size:9.5px;font-weight:700;padding:2px 5px;border-radius:3px;letter-spacing:.03em}
+  .srow{display:flex;align-items:baseline;gap:9px;padding:4px 0;
+        border-bottom:1px solid var(--board-line);font-size:13.5px}
+  .srow .t{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-dim);
+           flex:0 0 44px;font-size:12.5px}
+  .srow .b{flex:0 0 auto;font-size:9.5px;font-weight:700;padding:2px 5px;
+           border-radius:3px;letter-spacing:.03em}
   .b.espnplus{background:#c8102e;color:#fff}
   .b.secnplus{background:#1a3d7c;color:#fff}
   .b.accnx{background:#013ca6;color:#fff}
   .b.mwplus{background:#39603d;color:#fff}
   .srow .m{flex:1;min-width:0}
 
+  /* ---- search ---- */
+  .controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 0 12px}
+  .search{position:relative;display:flex;align-items:center}
+  .search input{
+    font-family:"Barlow",sans-serif;font-size:14px;
+    background:var(--board-bg);color:var(--ink);
+    border:1px solid var(--board-line-strong);border-radius:999px;
+    padding:8px 30px 8px 14px;width:230px;outline:none;
+  }
+  .search input::placeholder{color:var(--ink-dim)}
+  .search input:focus{border-color:var(--accent)}
+  .search input::-webkit-search-cancel-button{display:none}
+  .search button{
+    position:absolute;right:7px;background:none;border:0;cursor:pointer;
+    color:var(--ink-dim);font-size:19px;line-height:1;padding:0 4px;
+  }
+  .search button:hover{color:var(--ink)}
+  .hits{font-size:12px;color:var(--ink-dim)}
+  .game.hit{outline:2px solid var(--accent);outline-offset:1px}
+
   /* ---- conference filter ---- */
+  .filterwrap{padding:0 0 12px}
+  .fbtn{
+    display:inline-flex;align-items:center;gap:7px;
+    background:none;border:0;cursor:pointer;color:var(--ink-dim);
+    font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;
+    letter-spacing:.04em;text-transform:uppercase;padding:4px 0 8px;
+  }
+  .fbtn:hover{color:var(--ink)}
+  .fbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .fbtn .caret{display:inline-block;transition:transform .15s ease;font-size:11px}
+  .fbtn[aria-expanded="false"] .caret{transform:rotate(-90deg)}
+  .fbtn .fnow{
+    font-family:"Barlow",sans-serif;font-size:11px;font-weight:600;
+    text-transform:none;letter-spacing:0;color:var(--accent);
+  }
+  .filterwrap .filter{padding:0}
+  .filterwrap[data-collapsed="true"] .filter{display:none}
+  @media (prefers-reduced-motion:reduce){.fbtn .caret{transition:none}}
+
   .filter{
     display:flex;align-items:center;gap:7px;flex-wrap:wrap;
     padding:0 0 14px;
@@ -304,11 +472,28 @@
 
   <div class="weeks" id="weeks" role="group" aria-label="Choose a Saturday"></div>
   <div class="stamp" id="stamp"></div>
-  <div class="filter" id="filter" role="group" aria-label="Filter by conference"></div>
+  <div class="controls">
+    <div class="search">
+      <input id="q" type="search" placeholder="Search teams&hellip;"
+             autocomplete="off" spellcheck="false" aria-label="Search by team">
+      <button id="qclear" type="button" aria-label="Clear search" hidden>&times;</button>
+    </div>
+    <span class="hits" id="hits"></span>
+  </div>
+  <div class="filterwrap">
+    <button class="fbtn" id="ftoggle" type="button" aria-expanded="true" aria-controls="filter">
+      <span class="caret">&#9662;</span>Conferences<span class="fnow" id="fnow"></span>
+    </button>
+    <div class="filter" id="filter" role="group" aria-label="Filter by conference"></div>
+  </div>
 
   <div class="board">
     <div class="grid" id="grid"></div>
     <div class="empty" id="empty">No televised games involve this conference. Check the streaming list below.</div>
+  </div>
+
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Game detail">
+    <div class="card" id="card"></div>
   </div>
 
   <section class="stream">
@@ -484,30 +669,31 @@ function drawWeek(W){
     }
 
     for (const g of r.games){
-      const el = document.createElement("div");
+      const el = document.createElement("button");
+      el.type = "button";
       el.className = "game";
       el.style.gridColumn = `${g.col} / span ${W.span}`;
       el.style.gridRow = g.lane;
       el.dataset.conf = g.conf;
+      el.dataset.teams = (g.away.name + " " + g.home.name).toLowerCase();
+      el.setAttribute("aria-label",
+        `${g.away.name} at ${g.home.name}, ${fmtTime(g.iso).join(" ")} on ${r.net}`);
       el.innerHTML =
-        `<div class="side" style="background:${g.away.colour};color:${g.away_ink}">
+        `<span class="t l" style="background:${g.away.colour};color:${g.away_ink}">
            ${g.away.rank ? `<span class="rk">#${g.away.rank}</span>` : ""}<span class="nm">${esc(g.away.name)}</span>
-           ${g.away.rec ? `<span class="rec">${esc(g.away.rec)}</span>` : ""}
-           ${g.away.spread ? `<span class="sp">${esc(g.away.spread)}</span>` : ""}
-           <span class="kick">${esc(fmtTime(g.iso).join(" "))}</span>
-         </div>
-         <div class="side" style="background:${g.home.colour};color:${g.home_ink}">
-           <span class="at">at</span>${g.home.rank ? `<span class="rk">#${g.home.rank}</span>` : ""}<span class="nm">${esc(g.home.name)}</span>
-           ${g.home.rec ? `<span class="rec">${esc(g.home.rec)}</span>` : ""}
-           ${g.home.spread ? `<span class="sp">${esc(g.home.spread)}</span>` : ""}
-         </div>`;
+         </span>
+         <span class="t r" style="background:${g.home.colour};color:${g.home_ink}">
+           <span class="nm">${esc(g.home.name)}</span>${g.home.rank ? `<span class="rk">#${g.home.rank}</span>` : ""}
+         </span>
+         <span class="at">@</span>`;
+      el.addEventListener("click", () => openSheet(g, r.net));
       row.appendChild(el);
     }
     grid.appendChild(row);
   }
 
   streamEl.innerHTML = W.stream.map(s =>
-    `<div class="srow" data-conf="${s.conf}">
+    `<div class="srow" data-conf="${s.conf}" data-teams="${esc(s.match.toLowerCase())}">
        <span class="t">${esc(fmtTime(s.iso)[0])}</span>
        <span class="b ${s.badge}">${esc(s.net)}</span>
        <span class="m">${esc(s.match)}</span>
@@ -526,29 +712,249 @@ function drawWeek(W){
     b.addEventListener("click", () => applyFilter(c.key));
     bar.appendChild(b);
   }
-  applyFilter(conf);
+  apply();
 }
+
+let query = "";
 
 function applyFilter(key){
   conf = key;
   try { localStorage.setItem("cfb.conf", key); } catch (e) {}
-  bar.querySelectorAll(".chip").forEach(b =>
-    b.setAttribute("aria-pressed", String(b.dataset.key === key)));
-  let onTV = 0;
-  document.querySelectorAll(".netrow").forEach(row => {
-    let hit = false;
-    row.querySelectorAll(".game").forEach(el => {
-      const m = key === "ALL" || el.dataset.conf.includes(`|${key}|`);
-      el.classList.toggle("dim", !m);
-      if (m){ hit = true; onTV++; }
-    });
-    row.style.display = hit ? "" : "none";
-  });
-  emptyEl.classList.toggle("on", onTV === 0);
-  document.querySelectorAll(".srow").forEach(r => {
-    r.style.display = (key === "ALL" || r.dataset.conf.includes(`|${key}|`)) ? "" : "none";
-  });
+  apply();
 }
+
+/* Conference and search combine: a game must satisfy both. Search matches are
+   outlined as well as kept, so with a broad conference selected you can still
+   see where your team sits rather than losing the surrounding context. */
+const sheet = document.getElementById("sheet");
+const card  = document.getElementById("card");
+let lastFocus = null;
+
+/* Everything that will not fit on a 30px bar lives here: records, the line,
+   conferences and the kickoff in both zones. */
+function openSheet(g, net){
+  lastFocus = document.activeElement;
+
+  /* One kickoff line, not two. zoneLabel() returns EDT/EST, never the literal
+     "ET", so comparing labels always looked like a mismatch and drew the same
+     time twice. Compare the rendered times instead and only add the Eastern
+     reading when it genuinely differs. */
+  const localStr = fmtTime(g.iso).join(" ");
+  const etStr = new Intl.DateTimeFormat("en-US", {
+    timeZone: ET_ZONE, hour: "numeric", minute: "2-digit", hour12: true
+  }).format(new Date(g.iso));
+  const sameClock = localStr === etStr + "";
+  const kickoff = sameClock
+    ? `${localStr} ${zoneLabel()}`
+    : `${localStr} ${zoneLabel()} <span style="opacity:.6">&middot; ${etStr} ET</span>`;
+
+  const team = (t, label) => `
+    <div class="tm" style="background:${t.colour};color:${ink(t.colour)}">
+      <div class="side-label">${label}</div>
+      <div class="name">${t.rank ? `#${t.rank} ` : ""}${esc(t.name)}</div>
+      <div class="meta">${t.rec ? esc(t.rec) : "&mdash;"} &middot; ${esc(t.conf)}</div>
+    </div>`;
+
+  const row = (k, v) => v ? `<div class="r"><span>${k}</span><span>${v}</span></div>` : "";
+  const spread = (g.away.spread || g.home.spread)
+    ? `${esc(g.away.name)} ${esc(g.away.spread)} &nbsp;/&nbsp; ${esc(g.home.name)} ${esc(g.home.spread)}`
+    : "";
+
+  /* Comparison row: away value, label, home value. Rendered only when at least
+     one side has something, so a sparse feed does not leave empty scaffolding. */
+  const cmp = (label, av, hv) => (av || hv)
+    ? `<div class="cr"><span class="v a">${av || "&mdash;"}</span>
+         <span class="lab">${label}</span>
+         <span class="v b">${hv || "&mdash;"}</span></div>`
+    : "";
+
+  /* Matchup predictor as a split track rather than ESPN's donut — a bar reads
+     faster at this size and shows the margin between the two directly. */
+  let predictor = "";
+  if (g.pred && (g.pred.away || g.pred.home)){
+    const aw = Math.max(0, Math.min(100, g.pred.away));
+    const hw = Math.max(0, Math.min(100, g.pred.home));
+    predictor = `
+      <div class="pred">
+        <div class="head">Matchup predictor</div>
+        <div class="track" role="img"
+             aria-label="${esc(g.away.name)} ${aw} percent, ${esc(g.home.name)} ${hw} percent">
+          <div class="seg" style="flex:0 0 ${aw}%;background:${g.away.colour};color:${ink(g.away.colour)}">
+            <span>${aw}%</span></div>
+          <div class="seg b" style="flex:0 0 ${hw}%;background:${g.home.colour};color:${ink(g.home.colour)}">
+            <span>${hw}%</span></div>
+        </div>
+        <div class="who"><span>${esc(g.away.name)}</span><span>${esc(g.home.name)}</span></div>
+        <div class="src">According to ESPN Analytics</div>
+      </div>`;
+  }
+
+  const A = g.away.recs || {}, H = g.home.recs || {};
+  let compare =
+      cmp("Record",   esc(A.total || A.overall || g.away.rec || ""),
+                      esc(H.total || H.overall || g.home.rec || "")) +
+      cmp("Home",     esc(A.home || ""), esc(H.home || "")) +
+      cmp("Away",     esc(A.road || A.away || ""), esc(H.road || H.away || "")) +
+      cmp("In conf.", esc(A.vsconf || ""), esc(H.vsconf || "")) +
+      cmp("Ranking",  g.away.rank ? "#" + g.away.rank : "", g.home.rank ? "#" + g.home.rank : "") +
+      cmp("Conference", esc(g.away.conf), esc(g.home.conf));
+
+  /* Leaders come back per category and the two teams do not always lead the
+     same ones, so line them up by category name rather than by position. */
+  const al = g.away.leaders || [], hl = g.home.leaders || [];
+  const cats = [];
+  [...al, ...hl].forEach(L => { if (!cats.includes(L.cat)) cats.push(L.cat); });
+  const val = (list, c) => {
+    const f = list.find(x => x.cat === c);
+    return f ? `${esc(f.val)}<span class="who">${esc(f.who)}</span>` : "";
+  };
+  let leaders = cats.map(c =>
+    `<div class="cr"><span class="v a lead">${val(al, c) || "&mdash;"}</span>
+       <span class="lab">${esc(c)}</span>
+       <span class="v b lead">${val(hl, c) || "&mdash;"}</span></div>`).join("");
+
+  /* FPI is a separate ESPN feed and can be absent without the rest being
+     absent, so it gets its own group and simply does not render when empty. */
+  const af = g.away.fpi || {}, hf = g.home.fpi || {};
+  const fpiRows =
+      cmp("FPI",        esc(af.fpi   || ""), esc(hf.fpi   || "")) +
+      cmp("FPI rank",   af.rank ? "#" + esc(af.rank) : "", hf.rank ? "#" + esc(hf.rank) : "") +
+      cmp("Proj. wins", esc(af.projw || ""), esc(hf.projw || "")) +
+      cmp("Sched. rank", af.sos ? "#" + esc(af.sos) : "", hf.sos ? "#" + esc(hf.sos) : "");
+
+  if (!compare) compare = `<div class="none">No team records in the feed yet.</div>`;
+
+  card.innerHTML = `
+    <div class="teams">${team(g.away, "Away")}${team(g.home, "Home")}</div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true"  data-pane="game">Game</button>
+      <button type="button" role="tab" aria-selected="false" data-pane="teams">Teams</button>
+    </div>
+    <div class="pane on" data-pane="game">
+      ${predictor}
+      <div class="rows">
+        ${row("Network", esc(net))}
+        ${row("Kickoff", kickoff)}
+        ${row("Spread", spread)}
+        ${row("Over / under", g.line && g.line.ou ? g.line.ou : "")}
+      </div>
+      ${g.espn ? `<a class="espn" href="${g.espn}" target="_blank" rel="noopener noreferrer">
+        View on ESPN &nearr;</a>` : ""}
+    </div>
+    <div class="pane" data-pane="teams">
+      <div class="cmp">${compare}${
+        fpiRows ? `<div class="grp">Power index</div>${fpiRows}` : ""}${
+        leaders ? `<div class="grp">Season leaders</div>${leaders}` : ""}</div>
+    </div>
+    <div class="bar">
+      <b>${esc(g.away.name)} at ${esc(g.home.name)}</b>
+      <button type="button" id="sheetclose">Close</button>
+    </div>`;
+
+  card.querySelectorAll('.tabs button').forEach(b => {
+    b.addEventListener("click", () => {
+      card.querySelectorAll('.tabs button').forEach(x =>
+        x.setAttribute("aria-selected", String(x === b)));
+      card.querySelectorAll('.pane').forEach(p =>
+        p.classList.toggle("on", p.dataset.pane === b.dataset.pane));
+    });
+  });
+
+  sheet.classList.add("on");
+  document.getElementById("sheetclose").focus();
+}
+
+function closeSheet(){
+  sheet.classList.remove("on");
+  if (lastFocus) lastFocus.focus();
+}
+
+sheet.addEventListener("click", e => { if (e.target === sheet) closeSheet(); });
+card.addEventListener("click", e => {
+  if (e.target && e.target.id === "sheetclose") closeSheet();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && sheet.classList.contains("on")) closeSheet();
+});
+
+function ink(hex){
+  const n = parseInt(hex.slice(1), 16);
+  return (0.2126*(n>>16) + 0.7152*((n>>8)&255) + 0.0722*(n&255)) > 150
+    ? "#10233d" : "#ffffff";
+}
+
+function apply(){
+  const q = query.trim().toLowerCase();
+  bar.querySelectorAll(".chip").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.key === conf)));
+
+  let shown = 0, matched = 0;
+  document.querySelectorAll(".netrow").forEach(row => {
+    let visible = false;
+    row.querySelectorAll(".game").forEach(el => {
+      const inConf = conf === "ALL" || el.dataset.conf.includes(`|${conf}|`);
+      const isHit  = q !== "" && el.dataset.teams.includes(q);
+      const keep   = inConf && (q === "" || isHit);
+      el.classList.toggle("dim", !keep);
+      el.classList.toggle("hit", keep && isHit);
+      if (keep){ visible = true; shown++; }
+      if (isHit && inConf) matched++;
+    });
+    row.style.display = visible ? "" : "none";
+  });
+
+  let streamShown = 0;
+  document.querySelectorAll(".srow").forEach(r => {
+    const inConf = conf === "ALL" || r.dataset.conf.includes(`|${conf}|`);
+    const keep = inConf && (q === "" || r.dataset.teams.includes(q));
+    r.style.display = keep ? "" : "none";
+    if (keep) streamShown++;
+  });
+
+  const fnow = document.getElementById("fnow");
+  if (fnow) fnow.textContent = conf === "ALL" ? "" : conf;
+
+  emptyEl.classList.toggle("on", shown === 0);
+  const hits = document.getElementById("hits");
+  if (q === ""){
+    hits.textContent = "";
+  } else {
+    const total = shown + streamShown;
+    hits.textContent = total === 0
+      ? `no games matching \u201c${q}\u201d`
+      : `${total} game${total === 1 ? "" : "s"} matching \u201c${q}\u201d`;
+  }
+  document.getElementById("qclear").hidden = q === "";
+}
+
+/* Collapsed by default on narrow screens, where thirteen chips push the grid
+   below the fold. The active conference stays visible on the button so the
+   state is never hidden. */
+const fwrap  = document.querySelector(".filterwrap");
+const ftog   = document.getElementById("ftoggle");
+let fopen = window.innerWidth > 700;
+try {
+  const v = localStorage.getItem("cfb.filteropen");
+  if (v !== null) fopen = v === "1";
+} catch (e) {}
+
+function setFilterOpen(v){
+  fopen = v;
+  fwrap.dataset.collapsed = String(!v);
+  ftog.setAttribute("aria-expanded", String(v));
+  try { localStorage.setItem("cfb.filteropen", v ? "1" : "0"); } catch (e) {}
+}
+ftog.addEventListener("click", () => setFilterOpen(!fopen));
+setFilterOpen(fopen);
+
+const qInput = document.getElementById("q");
+qInput.addEventListener("input", e => { query = e.target.value; apply(); });
+qInput.addEventListener("keydown", e => {
+  if (e.key === "Escape"){ qInput.value = ""; query = ""; apply(); }
+});
+document.getElementById("qclear").addEventListener("click", () => {
+  qInput.value = ""; query = ""; apply(); qInput.focus();
+});
 
 showWeek(0);
 </script>

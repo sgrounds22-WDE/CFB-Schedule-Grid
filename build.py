@@ -14,7 +14,7 @@ Data comes from ESPN's public scoreboard endpoint, which returns kickoff time,
 broadcast network, AP rank, conference id and team colors as structured JSON.
 """
 
-import argparse, datetime as dt, json, os, sys, urllib.request
+import argparse, datetime as dt, json, os, re, sys, urllib.request
 from collections import defaultdict
 
 import icons
@@ -94,6 +94,17 @@ NETWORK_ALIASES = {
 STREAM_BADGES = {"ESPN+": "espnplus", "SECN+": "secnplus",
                  "ACCNX": "accnx", "MW+": "mwplus", "ESPN3": "espnplus"}
 
+# ESPN's Football Power Index. A different API family from the scoreboard —
+# core-v2 rather than site-v2 — but one call covers every team, and the team id
+# is embedded in the $ref URL so it needs no follow-up requests.
+FPI_URL = ("https://sports.core.api.espn.com/v2/sports/football/leagues/"
+           "college-football/seasons/{year}/powerindex?limit=400")
+
+# Matchup Predictor. Unlike FPI this is per game, so it is fetched only for the
+# first week by default (see --predict-weeks) to keep request volume sane.
+PREDICTOR_URL = ("https://sports.core.api.espn.com/v2/sports/football/leagues/"
+                 "college-football/events/{eid}/competitions/{eid}/predictor")
+
 
 # ---------------------------------------------------------------- fetching
 
@@ -108,16 +119,131 @@ def target_saturday(today=None):
     return today + dt.timedelta(days=(5 - today.weekday()) % 7)
 
 
+def _request(url, headers):
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+def fetch_fpi(year):
+    """Best effort. Returns {team_id: {...}}, or {} if anything goes wrong.
+
+    FPI is a bonus column; the schedule must still build without it, so every
+    failure here is swallowed and reported rather than raised.
+    """
+    url = FPI_URL.format(year=year)
+    for label, headers in HEADER_PROFILES:
+        try:
+            data = _request(url, headers)
+        except Exception:
+            continue
+
+        out = {}
+        for item in data.get("items", []):
+            ref = (item.get("team") or {}).get("$ref") or ""
+            m = re.search(r"/teams/(\d+)", ref)
+            if not m:
+                continue
+            vals = {}
+            for cat in item.get("categories", []):
+                for st in cat.get("stats", []):
+                    name = (st.get("name") or "").lower()
+                    if name:
+                        vals[name] = st.get("displayValue")
+                        if vals[name] is None:
+                            vals[name] = st.get("value")
+            if vals:
+                out[m.group(1)] = {
+                    "fpi":   vals.get("fpi"),
+                    "rank":  vals.get("fpirank"),
+                    "projw": vals.get("projectedwins"),
+                    "projl": vals.get("projectedlosses"),
+                    "sos":   vals.get("strengthofschedule") or vals.get("sos"),
+                }
+        if out:
+            print(f"  FPI: {len(out)} teams [{label}]", file=sys.stderr)
+            return out
+
+    print("  FPI unavailable — building without it", file=sys.stderr)
+    return {}
+
+
+def _projection(side):
+    """Pull a win percentage out of one side of a predictor response.
+
+    The field has been called gameProjection and teamChanceWin at different
+    times, so match on the shape of the name rather than an exact string.
+    """
+    if not isinstance(side, dict):
+        return None
+    for st in (side.get("statistics") or []):
+        name = (st.get("name") or "").lower()
+        if "projection" in name or "chancewin" in name or name == "gameprojection":
+            v = st.get("displayValue")
+            if v is None:
+                v = st.get("value")
+            try:
+                return round(float(str(v).replace("%", "")), 1)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def fetch_predictor(eid):
+    """Best effort per game. Returns (away_pct, home_pct) or None."""
+    if not eid:
+        return None
+    url = PREDICTOR_URL.format(eid=eid)
+    try:
+        data = _request(url, HEADER_PROFILES[0][1])
+    except Exception:
+        return None
+
+    away = _projection(data.get("awayTeam"))
+    home = _projection(data.get("homeTeam"))
+
+    # Older/alternate shape carries plain percentages on the root object.
+    if away is None and home is None:
+        try:
+            aw = data.get("awayWinPercentage")
+            hw = data.get("homeWinPercentage")
+            if aw is not None and hw is not None:
+                away, home = round(float(aw) * 100, 1), round(float(hw) * 100, 1)
+        except (TypeError, ValueError):
+            return None
+
+    if away is None and home is None:
+        return None
+    if away is None:
+        away = round(100 - home, 1)
+    if home is None:
+        home = round(100 - away, 1)
+    return (away, home)
+
+
+def add_predictions(games, workers=8):
+    """Fetch predictors concurrently and attach them. Failures are silent."""
+    todo = [g for g in games if g.get("eid")]
+    if not todo:
+        return 0
+    from concurrent.futures import ThreadPoolExecutor
+    got = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for g, res in zip(todo, pool.map(lambda x: fetch_predictor(x["eid"]), todo)):
+            if res:
+                g["pred"] = {"away": res[0], "home": res[1]}
+                got += 1
+    return got
+
+
 def fetch(day):
     """Try each host/header combination until one answers with JSON."""
     attempts = []
     for url_tpl in API_HOSTS:
         url = url_tpl.format(ymd=day.strftime("%Y%m%d"))
         for label, headers in HEADER_PROFILES:
-            req = urllib.request.Request(url, headers=headers)
             try:
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    data = json.load(r)
+                data = _request(url, headers)
                 host = url.split("/")[2]
                 print(f"  fetched via {host} [{label}]", file=sys.stderr)
                 return data
@@ -137,11 +263,24 @@ def fetch(day):
         "somewhere with a residential IP.")
 
 
-def normalise(payload):
+def normalise(payload, fpi=None):
     """ESPN events -> flat game dicts. Returns (games, unknown_conf_ids)."""
+    fpi = fpi or {}
     games, unknown = [], {}
     for ev in payload.get("events", []):
         comp = ev["competitions"][0]
+
+        # Prefer the link ESPN supplies; fall back to building one from the id.
+        espn = ""
+        for l in (ev.get("links") or []):
+            rels = l.get("rel") or []
+            if "summary" in rels or "desktop" in rels:
+                espn = l.get("href") or ""
+                if espn:
+                    break
+        if not espn and ev.get("id"):
+            espn = ("https://www.espn.com/college-football/game/_/gameId/"
+                    + str(ev["id"]))
         sides = {c["homeAway"]: c for c in comp["competitors"]}
         if "home" not in sides or "away" not in sides:
             continue
@@ -155,6 +294,21 @@ def normalise(payload):
         # request. They are absent for games more than a week or two out, and
         # every field here is optional — treat a missing block as "no line yet"
         # rather than an error.
+        # Season leaders, keyed by team id. Present on upcoming games in most
+        # weeks but not guaranteed, so every level here is optional.
+        leaders = {}
+        for cat in (comp.get("leaders") or []):
+            label = (cat.get("shortDisplayName") or cat.get("displayName")
+                     or cat.get("name") or "")
+            for L in (cat.get("leaders") or [])[:1]:
+                tid = str(((L.get("team") or {}).get("id")) or "")
+                ath = (L.get("athlete") or {}) or {}
+                who = ath.get("shortName") or ath.get("displayName") or ""
+                val = L.get("displayValue") or ""
+                if tid and label and val:
+                    leaders.setdefault(tid, []).append(
+                        {"cat": label, "who": who, "val": val})
+
         odds = (comp.get("odds") or [{}])[0] or {}
         spread = odds.get("spread")
         try:
@@ -181,14 +335,13 @@ def normalise(payload):
             # the one wanted is type "total". Records are current as of the
             # build, not as of that game — fine for this week, slightly ahead
             # of itself on the later tabs.
-            rec = ""
+            recs = {}
             for r in (c.get("records") or []):
-                if r.get("type") == "total" or r.get("name") == "overall":
-                    rec = r.get("summary") or ""
-                    break
-            else:
-                if c.get("records"):
-                    rec = (c["records"][0].get("summary") or "")
+                key = (r.get("type") or r.get("name") or "").lower()
+                if key and r.get("summary"):
+                    recs[key] = r["summary"]
+            rec = (recs.get("total") or recs.get("overall")
+                   or (list(recs.values())[0] if recs else ""))
             side_odds = odds.get(f"{which}TeamOdds") or {}
             fav = bool(side_odds.get("favorite"))
             # "-3.5" against the favourite, "+3.5" against the dog. A pick'em
@@ -207,6 +360,9 @@ def normalise(payload):
                 "spread": sp,
                 "fav": fav,
                 "rec": rec,
+                "recs": recs,
+                "leaders": leaders.get(str(t.get("id") or ""), []),
+                "fpi": fpi.get(str(t.get("id") or "")) or {},
             }
 
         games.append({
@@ -214,6 +370,9 @@ def normalise(payload):
                 comp["date"].replace("Z", "+00:00")).astimezone(ET),
             "net": net,
             "line": line,
+            "espn": espn,
+            "eid": str(ev.get("id") or ""),
+            "pred": None,
             "away": side("away"),
             "home": side("home"),
         })
@@ -307,6 +466,8 @@ def render_week(games, day):
                     "time": " ".join(clock(g["kick"])),
                     "iso": g["kick"].isoformat(),
                     "line": g["line"],
+                    "espn": g["espn"],
+                    "pred": g.get("pred"),
                     "away": g["away"], "home": g["home"],
                     "away_ink": ink(g["away"]["colour"]),
                     "home_ink": ink(g["home"]["colour"]),
@@ -353,6 +514,9 @@ def main():
     p.add_argument("--date", help="first Saturday; defaults to the next one")
     p.add_argument("--weeks", type=int, default=3,
                    help="how many Saturdays to bake in (default 3)")
+    p.add_argument("--predict-weeks", type=int, default=1, dest="predict_weeks",
+                   help="how many of those weeks get matchup predictions "
+                        "(one request per game; default 1, 0 disables)")
     p.add_argument("--out", default="public/index.html",
                    help="HTML output path (Firebase Hosting serves this dir)")
     p.add_argument("--json", dest="json_out", default="public/schedule.json",
@@ -360,11 +524,16 @@ def main():
     a = p.parse_args()
 
     first = dt.date.fromisoformat(a.date) if a.date else target_saturday()
+
+    # Season year: a January game belongs to the previous season.
+    season = first.year if first.month >= 7 else first.year - 1
+    fpi = fetch_fpi(season)
+
     weeks, unknown, stray = [], {}, set()
 
     for i in range(max(1, a.weeks)):
         day = first + dt.timedelta(days=7 * i)
-        games, unk = normalise(fetch(day))
+        games, unk = normalise(fetch(day), fpi)
         unknown.update(unk)
         stray |= {g["net"] for g in games
                   if g["net"] and g["net"] not in GRID_NETWORKS
@@ -373,6 +542,11 @@ def main():
         if not games:
             print(f"  {day}: no games returned, skipping", file=sys.stderr)
             continue
+
+        if i < a.predict_weeks:
+            got = add_predictions(games)
+            print(f"  {day}: predictions for {got}/{len(games)} games",
+                  file=sys.stderr)
 
         try:
             weeks.append(render_week(games, day))
