@@ -294,20 +294,27 @@ def normalise(payload, fpi=None):
         # request. They are absent for games more than a week or two out, and
         # every field here is optional — treat a missing block as "no line yet"
         # rather than an error.
-        # Season leaders, keyed by team id. Present on upcoming games in most
-        # weeks but not guaranteed, so every level here is optional.
+        # Season leaders, keyed by team id. ESPN ranks each category across BOTH
+        # teams, so taking only the first entry gives the leading team a row and
+        # leaves the other blank. Walk the whole list and keep the best entry
+        # per team per category instead.
         leaders = {}
         for cat in (comp.get("leaders") or []):
             label = (cat.get("shortDisplayName") or cat.get("displayName")
                      or cat.get("name") or "")
-            for L in (cat.get("leaders") or [])[:1]:
+            if not label:
+                continue
+            seen = set()
+            for L in (cat.get("leaders") or []):
                 tid = str(((L.get("team") or {}).get("id")) or "")
                 ath = (L.get("athlete") or {}) or {}
                 who = ath.get("shortName") or ath.get("displayName") or ""
                 val = L.get("displayValue") or ""
-                if tid and label and val:
-                    leaders.setdefault(tid, []).append(
-                        {"cat": label, "who": who, "val": val})
+                if not (tid and val) or tid in seen:
+                    continue          # already have this team's best here
+                seen.add(tid)
+                leaders.setdefault(tid, []).append(
+                    {"cat": label, "who": who, "val": val})
 
         odds = (comp.get("odds") or [{}])[0] or {}
         spread = odds.get("spread")
