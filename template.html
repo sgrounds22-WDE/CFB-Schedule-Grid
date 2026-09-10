@@ -16,6 +16,21 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="__APP_SHORT__">
+
+<!-- Link previews. Messages and Slack read these, not the touch icon, and the
+     image URL must be absolute. og:title is static on purpose: the crawler may
+     not run the script that sets the live title. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="__APP_NAME__">
+<meta property="og:title" content="__APP_NAME__">
+<meta property="og:description" content="Every televised game this Saturday, laid out by network. Filter by conference.">
+<meta property="og:url" content="__SITE_URL__/">
+<meta property="og:image" content="__SITE_URL__/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="__APP_NAME__">
+<meta name="twitter:image" content="__SITE_URL__/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">

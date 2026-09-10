@@ -297,6 +297,22 @@ def render(size, supersample=3, style=None):
     return out
 
 
+def render_banner(w=1200, h=630, style=None):
+    """Landscape card for link previews.
+
+    Messages, Slack and the rest read Open Graph images, not touch icons, and
+    they crop toward 1.91:1. Re-uses the square mark, centred on the field.
+    """
+    sq = render(h, style=style)
+    ox = (w - h) // 2
+    out = []
+    for y in range(h):
+        row = y * h
+        for x in range(w):
+            out.append(sq[row + (x - ox)] if ox <= x < ox + h else BG)
+    return out
+
+
 def build(outdir, sizes=(32, 180, 192, 512), source="icon-source.png"):
     """Write each icon size.
 
@@ -316,6 +332,23 @@ def build(outdir, sizes=(32, 180, 192, 512), source="icon-source.png"):
         name = f"icon-{size}.png"
         write_png(os.path.join(outdir, name), px, size, size)
         written.append(name)
+
+    # Link-preview card. Built from the same source so it never drifts.
+    if src:
+        side = min(src[1], src[2])
+        card = resize(src[0], src[1], src[2], 630)
+        bw, bh = 1200, 630
+        ox = (bw - bh) // 2
+        flat = []
+        for y in range(bh):
+            row = y * bh
+            for x in range(bw):
+                flat.append(card[row + (x - ox)] if ox <= x < ox + bh else BG)
+        write_png(os.path.join(outdir, "og-image.png"), flat, bw, bh)
+    else:
+        write_png(os.path.join(outdir, "og-image.png"),
+                  render_banner(), 1200, 630)
+    written.append("og-image.png")
     return written
 
 

@@ -24,6 +24,10 @@ import icons
 # under the home-screen icon, and the app title when launched from it.
 APP_NAME  = "CFB TV Schedule"   # full name — page heading, install prompt
 APP_SHORT = "CFB TV"            # home screen label; iOS truncates past ~12 chars
+
+# Link previews (Messages, Slack, WhatsApp) need an ABSOLUTE image URL — a
+# relative path is ignored and you get the generic browser glyph instead.
+SITE_URL  = "https://cfb-schedule-grid.web.app"
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Every kickoff in this script is Eastern. Linux and macOS ship the IANA time
@@ -293,7 +297,8 @@ def render_page(weeks, template_path="template.html"):
     tpl = open(template_path, encoding="utf-8").read()
     page = (tpl.replace("/*__DATA__*/null", json.dumps(doc))
                .replace("__APP_NAME__", APP_NAME)
-               .replace("__APP_SHORT__", APP_SHORT))
+               .replace("__APP_SHORT__", APP_SHORT)
+               .replace("__SITE_URL__", SITE_URL.rstrip("/")))
     return page, doc
 
 

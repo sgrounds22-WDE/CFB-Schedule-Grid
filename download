@@ -3,6 +3,7 @@ public/index.html
 public/schedule.json
 public/manifest.json
 public/*.png
+public/og-image.png
 out/
 
 # secrets
