@@ -151,6 +151,22 @@ def normalise(payload):
             nets += b.get("names", [])
         net = NETWORK_ALIASES.get(nets[0], nets[0]) if nets else ""
 
+        # Betting lines ride along in the same response, so this costs no extra
+        # request. They are absent for games more than a week or two out, and
+        # every field here is optional — treat a missing block as "no line yet"
+        # rather than an error.
+        odds = (comp.get("odds") or [{}])[0] or {}
+        spread = odds.get("spread")
+        try:
+            mag = abs(float(spread)) if spread is not None else None
+        except (TypeError, ValueError):
+            mag = None
+        line = {
+            "detail": odds.get("details") or "",
+            "ou": odds.get("overUnder"),
+            "mag": mag,
+        }
+
         def side(which):
             c = sides[which]
             t = c["team"]
@@ -160,17 +176,44 @@ def normalise(payload):
                 unknown.setdefault(cid, t.get("displayName", "?"))
             rank = (c.get("curatedRank") or {}).get("current")
             colour = t.get("color") or "2c4a70"
+
+            # Overall record. ESPN returns several (home, away, conference);
+            # the one wanted is type "total". Records are current as of the
+            # build, not as of that game — fine for this week, slightly ahead
+            # of itself on the later tabs.
+            rec = ""
+            for r in (c.get("records") or []):
+                if r.get("type") == "total" or r.get("name") == "overall":
+                    rec = r.get("summary") or ""
+                    break
+            else:
+                if c.get("records"):
+                    rec = (c["records"][0].get("summary") or "")
+            side_odds = odds.get(f"{which}TeamOdds") or {}
+            fav = bool(side_odds.get("favorite"))
+            # "-3.5" against the favourite, "+3.5" against the dog. A pick'em
+            # (spread 0) gets "PK", which is how it is written everywhere.
+            if mag is None:
+                sp = ""
+            elif mag == 0:
+                sp = "PK"
+            else:
+                sp = ("-" if fav else "+") + (f"{mag:g}")
             return {
                 "name": t.get("shortDisplayName") or t.get("location"),
                 "conf": conf,
                 "rank": rank if rank and rank <= 25 else None,
                 "colour": "#" + colour.lstrip("#"),
+                "spread": sp,
+                "fav": fav,
+                "rec": rec,
             }
 
         games.append({
             "kick": dt.datetime.fromisoformat(
                 comp["date"].replace("Z", "+00:00")).astimezone(ET),
             "net": net,
+            "line": line,
             "away": side("away"),
             "home": side("home"),
         })
@@ -263,6 +306,7 @@ def render_week(games, day):
                     "conf": f'|{g["away"]["conf"]}|{g["home"]["conf"]}|',
                     "time": " ".join(clock(g["kick"])),
                     "iso": g["kick"].isoformat(),
+                    "line": g["line"],
                     "away": g["away"], "home": g["home"],
                     "away_ink": ink(g["away"]["colour"]),
                     "home_ink": ink(g["home"]["colour"]),

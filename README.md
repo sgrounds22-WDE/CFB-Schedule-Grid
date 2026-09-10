@@ -49,11 +49,9 @@ the design.
 
 1. **Create the repo.** On github.com, make a repo and upload these files
    through the web uploader. Keep `.github/workflows/` intact.
-2. **Make the Hosting site.** Firebase console → your Family Dashboard project →
-   Hosting → **Add another site**. Name it something globally unique like
-   `smith-cfb-grid`. This does not touch the site the dashboard is on.
-3. **Bind the target.** Create `.firebaserc` in the repo root via GitHub's web
-   editor:
+2. **Make the Hosting site.** Firebase console → the `cfb-schedule-grid`
+   project → Hosting → **Get started**. The default site is named after the
+   project id, so the URL is `https://cfb-schedule-grid.web.app`.
 
    ```json
    {
@@ -120,15 +118,15 @@ Use `tasks.py` on any OS, or `make` on macOS and Linux:
 
 Add `--date 2026-09-12` or `--weeks 1` to any of them.
 
-## Protecting the dashboard
+## Deploy target guard
 
-The Family Dashboard is live on this project's default Hosting site, and **a
-Firebase deploy replaces a site's entire contents**. Three things prevent this
-project from ever landing there, and none should be removed:
+This project lives in its own Firebase project, so a deploy cannot reach
+anything else. The `cfb` hosting target is kept anyway, because a Firebase
+deploy replaces a site's entire contents and the guard catches a mistyped
+project id before that happens rather than after:
 
 - `firebase.json` declares `"target": "cfb"` rather than a bare hosting block.
-- Every deploy is scoped `--only hosting:cfb`. Plain `--only hosting` would
-  include the default site.
+- Every deploy is scoped `--only hosting:cfb`.
 - `check_target.py` runs before both the local and the CI deploy and refuses to
   continue if `.firebaserc` is missing, still holds placeholders, has no `cfb`
   binding, or binds `cfb` to more than one site.
@@ -187,6 +185,19 @@ failure.
 
 ## Tuning
 
+Everything worth changing sits at the top of two files.
+
+`build.py`:
+- `APP_NAME` / `APP_SHORT` — page heading, browser tab, home-screen label.
+- `SITE_URL` — used for the absolute Open Graph image URL in link previews.
 - `GRID_NETWORKS` — which networks get a row, in display order.
 - `CONF_ORDER` — order of the filter chips.
+
+`icons.py`:
+- `STYLE` — `football`, `football-bars`, `bars`, `cfb`, or `cfb-schedule`.
+- `LEATHER`, `TILT`, `BALL_A`, `BALL_B` — the football's look.
+- Or drop an `icon-source.png` in the repo root and it is used instead.
+
+Command line:
 - `--weeks N` — how many Saturdays to bake in.
+- `--date YYYY-MM-DD` — build a specific week.

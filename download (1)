@@ -1,0 +1,17 @@
+# build output — regenerated every run, deployed from CI
+public/index.html
+public/schedule.json
+public/manifest.json
+public/*.png
+public/og-image.png
+out/
+
+# secrets
+*serviceAccount*.json
+
+# local
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+.firebase/

@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "YOUR_PROJECT_ID"
+  },
+  "targets": {
+    "YOUR_PROJECT_ID": {
+      "hosting": {
+        "cfb": [
+          "YOUR_SITE_NAME"
+        ]
+      }
+    }
+  }
+}
