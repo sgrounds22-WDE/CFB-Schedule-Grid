@@ -3,9 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Football TV Schedule</title>
+<title>__APP_NAME__</title>
 <meta name="description" content="Saturday college football TV grid by network, with conference filtering.">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d2340">
+
+<!-- Home screen. iOS reads apple-touch-icon and the two apple-* meta tags;
+     Android reads the manifest. Both need the PNGs, not an SVG or emoji. -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="__APP_SHORT__">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -243,7 +253,7 @@
 <div class="wrap">
 
   <div class="masthead">
-    <h1>College football TV schedule<span id="subtitle"></span></h1>
+    <h1>__APP_NAME__<span id="subtitle"></span></h1>
     <div class="meta">
       Kickoff times in <b id="zonename">your local time</b>.<br>
       Rankings from the <b>AP Top 25</b>.<br>
@@ -389,7 +399,7 @@ function showWeek(i){
 function drawWeek(W){
   document.getElementById("subtitle").textContent = W.date_long;
   document.getElementById("zonename").textContent = zoneLabel();
-  document.title = "Football TV SChedule";
+  document.title = "__APP_SHORT__ \u2014 " + W.date_long;
 
   grid.innerHTML = "";
   grid.style.gridTemplateColumns = `var(--netw) repeat(${W.cols}, var(--col))`;

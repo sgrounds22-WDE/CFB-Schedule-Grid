@@ -16,6 +16,14 @@ broadcast network, AP rank, conference id and team colors as structured JSON.
 
 import argparse, datetime as dt, json, os, sys, urllib.request
 from collections import defaultdict
+
+import icons
+
+# ---------------------------------------------------------------- naming
+# Change these two and everything follows: browser tab, page heading, the name
+# under the home-screen icon, and the app title when launched from it.
+APP_NAME  = "CFB TV Schedule"   # full name — page heading, install prompt
+APP_SHORT = "CFB TV"            # home screen label; iOS truncates past ~12 chars
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Every kickoff in this script is Eastern. Linux and macOS ship the IANA time
@@ -85,9 +93,15 @@ STREAM_BADGES = {"ESPN+": "espnplus", "SECN+": "secnplus",
 
 # ---------------------------------------------------------------- fetching
 
-def next_saturday(today=None):
+def target_saturday(today=None):
+    """The Saturday to lead with — today, if today happens to be Saturday.
+
+    The daily rebuild runs early Eastern, so on game day this returns today and
+    the page shows the slate you are actually about to watch. Sunday through
+    Friday it returns the coming Saturday.
+    """
     today = today or dt.datetime.now(ET).date()
-    return today + dt.timedelta(days=(5 - today.weekday()) % 7 or 7)
+    return today + dt.timedelta(days=(5 - today.weekday()) % 7)
 
 
 def fetch(day):
@@ -277,7 +291,10 @@ def render_page(weeks, template_path="template.html"):
         "weeks": weeks,
     }
     tpl = open(template_path, encoding="utf-8").read()
-    return tpl.replace("/*__DATA__*/null", json.dumps(doc)), doc
+    page = (tpl.replace("/*__DATA__*/null", json.dumps(doc))
+               .replace("__APP_NAME__", APP_NAME)
+               .replace("__APP_SHORT__", APP_SHORT))
+    return page, doc
 
 
 # ---------------------------------------------------------------- cli
@@ -293,7 +310,7 @@ def main():
                    help="machine-readable feed; '' to skip")
     a = p.parse_args()
 
-    first = dt.date.fromisoformat(a.date) if a.date else next_saturday()
+    first = dt.date.fromisoformat(a.date) if a.date else target_saturday()
     weeks, unknown, stray = [], {}, set()
 
     for i in range(max(1, a.weeks)):
@@ -338,6 +355,31 @@ def main():
         with open(a.json_out, "w", encoding="utf-8") as f:
             json.dump(doc, f, indent=1)
         print(f"  wrote {a.json_out}", file=sys.stderr)
+
+    # Home-screen icons and the manifest that Android reads. iOS uses the
+    # apple-touch-icon link in the page instead, but wants the same PNG.
+    outdir = os.path.dirname(a.out) or "."
+    written = icons.build(outdir)
+    manifest = {
+        "name": APP_NAME,
+        "short_name": APP_SHORT,
+        "start_url": "./",
+        "display": "standalone",
+        "orientation": "landscape",
+        "background_color": "#081729",
+        "theme_color": "#0d2340",
+        "icons": [
+            {"src": "icon-192.png", "sizes": "192x192", "type": "image/png",
+             "purpose": "any"},
+            {"src": "icon-512.png", "sizes": "512x512", "type": "image/png",
+             "purpose": "any"},
+            {"src": "icon-512.png", "sizes": "512x512", "type": "image/png",
+             "purpose": "maskable"},
+        ],
+    }
+    with open(os.path.join(outdir, "manifest.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=1)
+    print(f"  wrote manifest.json and {len(written)} icons", file=sys.stderr)
 
 
 if __name__ == "__main__":
