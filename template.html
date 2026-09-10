@@ -267,9 +267,35 @@
     overscroll-behavior:contain;     /* stop the page behind scrolling with it */
   }
 
-  /* On a phone, a bottom sheet uses the space better than a centred card and
-     puts the tabs within thumb reach. */
-  @media (max-width:560px){
+  /* Landscape phones are wide but only ~380px tall, so this keys off height,
+     not width. The team header is the biggest fixed block in the card, so it
+     collapses to a single line and the chrome tightens around it. */
+  @media (max-height:520px){
+    .card{max-height:calc(100vh - 12px);max-height:calc(100dvh - 12px)}
+    .sheet{padding:6px}
+    .card .tm{padding:7px 12px 6px}
+    .card .tm .side-label{display:none}
+    .card .tm .name{font-size:15px;margin:0 0 2px}
+    .card .tm .meta{font-size:10.5px}
+    .card .tabs button{padding:6px 8px 5px;font-size:13.5px}
+    .card .rows{padding:2px 14px 10px}
+    .card .r{padding:6px 0;font-size:12.5px}
+    .cmp{padding:2px 14px 8px}
+    .cmp .cr{padding:5px 0;font-size:12.5px}
+    .cmp .grp{padding:9px 0 2px}
+    .pred{padding:8px 14px 2px}
+    .pred .head{margin-bottom:6px}
+    .pred .track{height:18px}
+    .pred .src{padding:5px 0 0}
+    .espn{margin:2px 14px 9px;padding:7px 12px}
+    .card .bar{padding:7px 14px}
+    .card .bar b{font-size:15px}
+    .card .bar button{padding:4px 11px}
+  }
+
+  /* On a phone held upright, a bottom sheet uses the space better than a
+     centred card and puts the tabs within thumb reach. */
+  @media (max-width:560px) and (min-height:521px){
     .sheet{padding:0;align-items:flex-end}
     .card{
       width:100%;max-width:none;
