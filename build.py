@@ -83,16 +83,22 @@ CONF_ORDER = ["SEC", "Big Ten", "Big 12", "ACC", "Pac-12", "American",
 # Networks that get a row in the grid, in display order. Anything not listed
 # here (ESPN+, SECN+, ACCNX, MW+) drops into the streaming list below the grid.
 GRID_NETWORKS = ["ABC", "CBS", "FOX", "NBC", "CW", "ESPN", "ESPN2", "ESPNU",
-                 "TNT", "FS1", "USA", "ACCN", "SECN", "BTN", "CBSSN"]
+                 "TNT", "FS1", "USA", "PEACOCK", "ACCN", "SECN", "BTN", "CBSSN"]
 
 NETWORK_ALIASES = {
     "ACC Network": "ACCN", "SEC Network": "SECN", "Big Ten Network": "BTN",
-    "CBS Sports Network": "CBSSN", "The CW": "CW", "USA Network": "USA",
+    "CBS Sports Network": "CBSSN", "The CW": "CW",
+    # ESPN abbreviates USA Network to "USA Net" in the scoreboard feed, which
+    # was dropping every USA game into the streaming list.
+    "USA Network": "USA", "USA Net": "USA", "USA Net.": "USA",
     "ESPN/Disney+": "ESPN", "ABC/Disney+": "ABC", "TNT/HBO Max": "TNT",
+    "TNT/truTV/HBO Max": "TNT", "Peacock": "PEACOCK", "NBC/Peacock": "NBC",
+    "FOX/FS1": "FOX", "CBSSN": "CBSSN",
 }
 
 STREAM_BADGES = {"ESPN+": "espnplus", "SECN+": "secnplus",
-                 "ACCNX": "accnx", "MW+": "mwplus", "ESPN3": "espnplus"}
+                 "ACCNX": "accnx", "MW+": "mwplus", "ESPN3": "espnplus",
+                 "ESPNU+": "espnplus", "Streaming": "espnplus"}
 
 # ESPN's Football Power Index. A different API family from the scoreboard —
 # core-v2 rather than site-v2 — but one call covers every team, and the team id
@@ -128,112 +134,74 @@ def _request(url, headers):
 def fetch_fpi(year):
     """Best effort. Returns {team_id: {...}}, or {} if anything goes wrong.
 
-    FPI is a bonus column; the schedule must still build without it, so every
-    failure here is swallowed and reported rather than raised.
+    The core-v2 list endpoint usually answers with bare {"$ref": ...} items
+    rather than inline stats, which is why an earlier build produced empty FPI
+    for every team. Detect that and expand the refs concurrently.
     """
     url = FPI_URL.format(year=year)
+    data = None
     for label, headers in HEADER_PROFILES:
         try:
             data = _request(url, headers)
+            break
         except Exception:
             continue
+    if not data:
+        print("  FPI unavailable - building without it", file=sys.stderr)
+        return {}
 
-        out = {}
-        for item in data.get("items", []):
-            ref = (item.get("team") or {}).get("$ref") or ""
-            m = re.search(r"/teams/(\d+)", ref)
-            if not m:
-                continue
-            vals = {}
-            for cat in item.get("categories", []):
-                for st in cat.get("stats", []):
-                    name = (st.get("name") or "").lower()
-                    if name:
-                        vals[name] = st.get("displayValue")
-                        if vals[name] is None:
-                            vals[name] = st.get("value")
-            if vals:
-                out[m.group(1)] = {
-                    "fpi":   vals.get("fpi"),
-                    "rank":  vals.get("fpirank"),
-                    "projw": vals.get("projectedwins"),
-                    "projl": vals.get("projectedlosses"),
-                    "sos":   vals.get("strengthofschedule") or vals.get("sos"),
-                }
-        if out:
-            print(f"  FPI: {len(out)} teams [{label}]", file=sys.stderr)
-            return out
+    items = data.get("items") or []
+    if not items:
+        print("  FPI returned no items - building without it", file=sys.stderr)
+        return {}
 
-    print("  FPI unavailable — building without it", file=sys.stderr)
-    return {}
+    # Expand any item that is only a reference.
+    refs = [i["$ref"] for i in items
+            if isinstance(i, dict) and "$ref" in i and "categories" not in i]
+    if refs:
+        from concurrent.futures import ThreadPoolExecutor
 
-
-def _projection(side):
-    """Pull a win percentage out of one side of a predictor response.
-
-    The field has been called gameProjection and teamChanceWin at different
-    times, so match on the shape of the name rather than an exact string.
-    """
-    if not isinstance(side, dict):
-        return None
-    for st in (side.get("statistics") or []):
-        name = (st.get("name") or "").lower()
-        if "projection" in name or "chancewin" in name or name == "gameprojection":
-            v = st.get("displayValue")
-            if v is None:
-                v = st.get("value")
+        def pull(u):
             try:
-                return round(float(str(v).replace("%", "")), 1)
-            except (TypeError, ValueError):
-                continue
-    return None
+                return _request(u, HEADER_PROFILES[0][1])
+            except Exception:
+                return None
 
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            items = [x for x in pool.map(pull, refs) if x]
 
-def fetch_predictor(eid):
-    """Best effort per game. Returns (away_pct, home_pct) or None."""
-    if not eid:
-        return None
-    url = PREDICTOR_URL.format(eid=eid)
-    try:
-        data = _request(url, HEADER_PROFILES[0][1])
-    except Exception:
-        return None
+    out = {}
+    for item in items:
+        ref = (item.get("team") or {}).get("$ref") or item.get("$ref") or ""
+        m = re.search(r"/teams/(\d+)", ref)
+        if not m:
+            continue
+        vals = {}
+        for cat in item.get("categories", []):
+            for st in cat.get("stats", []):
+                name = (st.get("name") or st.get("abbreviation") or "").lower()
+                if not name:
+                    continue
+                v = st.get("displayValue")
+                if v is None:
+                    v = st.get("value")
+                vals[name] = v
+        if vals:
+            out[m.group(1)] = {
+                "fpi":   vals.get("fpi"),
+                "rank":  vals.get("fpirank") or vals.get("rank"),
+                "projw": vals.get("projectedwins") or vals.get("proj w"),
+                "projl": vals.get("projectedlosses") or vals.get("proj l"),
+                "sos":   vals.get("strengthofschedulerank")
+                         or vals.get("strengthofschedule") or vals.get("sos"),
+            }
 
-    away = _projection(data.get("awayTeam"))
-    home = _projection(data.get("homeTeam"))
-
-    # Older/alternate shape carries plain percentages on the root object.
-    if away is None and home is None:
-        try:
-            aw = data.get("awayWinPercentage")
-            hw = data.get("homeWinPercentage")
-            if aw is not None and hw is not None:
-                away, home = round(float(aw) * 100, 1), round(float(hw) * 100, 1)
-        except (TypeError, ValueError):
-            return None
-
-    if away is None and home is None:
-        return None
-    if away is None:
-        away = round(100 - home, 1)
-    if home is None:
-        home = round(100 - away, 1)
-    return (away, home)
-
-
-def add_predictions(games, workers=8):
-    """Fetch predictors concurrently and attach them. Failures are silent."""
-    todo = [g for g in games if g.get("eid")]
-    if not todo:
-        return 0
-    from concurrent.futures import ThreadPoolExecutor
-    got = 0
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        for g, res in zip(todo, pool.map(lambda x: fetch_predictor(x["eid"]), todo)):
-            if res:
-                g["pred"] = {"away": res[0], "home": res[1]}
-                got += 1
-    return got
+    if out:
+        print(f"  FPI: {len(out)} teams", file=sys.stderr)
+    else:
+        print("  FPI parsed 0 teams - field names may have changed",
+              file=sys.stderr)
+    return out
 
 
 def fetch(day):
@@ -294,27 +262,42 @@ def normalise(payload, fpi=None):
         # request. They are absent for games more than a week or two out, and
         # every field here is optional — treat a missing block as "no line yet"
         # rather than an error.
-        # Season leaders, keyed by team id. ESPN ranks each category across BOTH
-        # teams, so taking only the first entry gives the leading team a row and
-        # leaves the other blank. Walk the whole list and keep the best entry
-        # per team per category instead.
-        leaders = {}
+        # Season leaders. Two shapes exist and they mean different things:
+        # competition-level `leaders` is the GAME leader per category - one
+        # entry, awarded to whichever side leads - while each competitor
+        # carries its own `leaders`. Only the second gives both teams a row,
+        # so prefer it and keep the first as a fallback.
+        def read_leaders(node):
+            out = []
+            for cat in (node.get("leaders") or []):
+                label = (cat.get("shortDisplayName") or cat.get("displayName")
+                         or cat.get("abbreviation") or cat.get("name") or "")
+                if not label:
+                    continue
+                for L in (cat.get("leaders") or [])[:1]:
+                    ath = (L.get("athlete") or {}) or {}
+                    who = ath.get("shortName") or ath.get("displayName") or ""
+                    val = L.get("displayValue") or ""
+                    if val:
+                        out.append({"cat": label, "who": who, "val": val})
+            return out
+
+        # fallback map, keyed by team id, from the competition-level block
+        game_leaders = {}
         for cat in (comp.get("leaders") or []):
             label = (cat.get("shortDisplayName") or cat.get("displayName")
-                     or cat.get("name") or "")
+                     or cat.get("abbreviation") or cat.get("name") or "")
             if not label:
                 continue
-            seen = set()
             for L in (cat.get("leaders") or []):
                 tid = str(((L.get("team") or {}).get("id")) or "")
                 ath = (L.get("athlete") or {}) or {}
-                who = ath.get("shortName") or ath.get("displayName") or ""
                 val = L.get("displayValue") or ""
-                if not (tid and val) or tid in seen:
-                    continue          # already have this team's best here
-                seen.add(tid)
-                leaders.setdefault(tid, []).append(
-                    {"cat": label, "who": who, "val": val})
+                if tid and val:
+                    game_leaders.setdefault(tid, []).append({
+                        "cat": label,
+                        "who": ath.get("shortName") or ath.get("displayName") or "",
+                        "val": val})
 
         odds = (comp.get("odds") or [{}])[0] or {}
         spread = odds.get("spread")
@@ -368,13 +351,22 @@ def normalise(payload, fpi=None):
                 "fav": fav,
                 "rec": rec,
                 "recs": recs,
-                "leaders": leaders.get(str(t.get("id") or ""), []),
+                "leaders": (read_leaders(c)
+                            or game_leaders.get(str(t.get("id") or ""), [])),
                 "fpi": fpi.get(str(t.get("id") or "")) or {},
             }
 
+        kick = dt.datetime.fromisoformat(
+            comp["date"].replace("Z", "+00:00")).astimezone(ET)
+
+        # ESPN parks games with no assigned window at midnight Eastern. Showing
+        # those as "12:00 AM" is worse than saying so - the third week is full
+        # of them until the networks make their selections.
+        tbd = (kick.hour == 0 and kick.minute == 0)
+
         games.append({
-            "kick": dt.datetime.fromisoformat(
-                comp["date"].replace("Z", "+00:00")).astimezone(ET),
+            "kick": kick,
+            "tbd": tbd,
             "net": net,
             "line": line,
             "espn": espn,
@@ -472,6 +464,7 @@ def render_week(games, day):
                     "conf": f'|{g["away"]["conf"]}|{g["home"]["conf"]}|',
                     "time": " ".join(clock(g["kick"])),
                     "iso": g["kick"].isoformat(),
+                    "tbd": g.get("tbd", False),
                     "line": g["line"],
                     "espn": g["espn"],
                     "pred": g.get("pred"),
@@ -488,6 +481,7 @@ def render_week(games, day):
         payload["stream"].append({
             "time": t, "ap": ap,
             "iso": g["kick"].isoformat(),
+            "tbd": g.get("tbd", False),
             "badge": STREAM_BADGES.get(g["net"], "espnplus"),
             "net": g["net"] or "Streaming",
             "conf": f'|{g["away"]["conf"]}|{g["home"]["conf"]}|',

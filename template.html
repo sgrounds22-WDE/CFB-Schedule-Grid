@@ -404,12 +404,14 @@
         border-bottom:1px solid var(--board-line);font-size:13.5px}
   .srow .t{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-dim);
            flex:0 0 44px;font-size:12.5px}
+  .srow .t.tbd{font-size:10.5px;letter-spacing:.06em;opacity:.75}
   .srow .b{flex:0 0 auto;font-size:9.5px;font-weight:700;padding:2px 5px;
            border-radius:3px;letter-spacing:.03em}
   .b.espnplus{background:#c8102e;color:#fff}
   .b.secnplus{background:#1a3d7c;color:#fff}
   .b.accnx{background:#013ca6;color:#fff}
   .b.mwplus{background:#39603d;color:#fff}
+  .b.peacock{background:#000;color:#fff}
   .srow .m{flex:1;min-width:0}
 
   /* ---- search ---- */
@@ -750,7 +752,7 @@ function drawWeek(W){
 
   streamEl.innerHTML = W.stream.map(s =>
     `<div class="srow" data-conf="${s.conf}" data-teams="${esc(s.match.toLowerCase())}">
-       <span class="t">${esc(fmtTime(s.iso)[0])}</span>
+       <span class="t${s.tbd ? " tbd" : ""}">${s.tbd ? "TBD" : esc(fmtTime(s.iso)[0])}</span>
        <span class="b ${s.badge}">${esc(s.net)}</span>
        <span class="m">${esc(s.match)}</span>
      </div>`).join("");
@@ -800,7 +802,10 @@ function openSheet(g, net){
     timeZone: ET_ZONE, hour: "numeric", minute: "2-digit", hour12: true
   }).format(new Date(g.iso));
   const sameClock = localStr === etStr + "";
-  const kickoff = sameClock
+  if (g.tbd) {
+    // No window assigned yet; a midnight timestamp is a placeholder, not news.
+    var kickoff = "Not yet scheduled";
+  } else var kickoff = sameClock
     ? `${localStr} ${zoneLabel()}`
     : `${localStr} ${zoneLabel()} <span style="opacity:.6">&middot; ${etStr} ET</span>`;
 
