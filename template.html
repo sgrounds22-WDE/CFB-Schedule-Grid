@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>College Football TV Schedule</title>
+<title>Football TV Schedule</title>
 <meta name="description" content="Saturday college football TV grid by network, with conference filtering.">
 <meta name="color-scheme" content="dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -389,7 +389,7 @@ function showWeek(i){
 function drawWeek(W){
   document.getElementById("subtitle").textContent = W.date_long;
   document.getElementById("zonename").textContent = zoneLabel();
-  document.title = "CFB TV \u2014 " + W.date_long;
+  document.title = "Football TV SChedule";
 
   grid.innerHTML = "";
   grid.style.gridTemplateColumns = `var(--netw) repeat(${W.cols}, var(--col))`;
