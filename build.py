@@ -111,6 +111,12 @@ FPI_URL = ("https://sports.core.api.espn.com/v2/sports/football/leagues/"
 PREDICTOR_URL = ("https://sports.core.api.espn.com/v2/sports/football/leagues/"
                  "college-football/events/{eid}/competitions/{eid}/predictor")
 
+# The FPI web page is driven by this one, which returns teams already expanded
+# instead of a list of $refs. Tried after the core endpoint.
+FPI_FITT_URL = ("https://site.web.api.espn.com/apis/fitt/v3/sports/football/"
+                "college-football/powerindex?region=us&lang=en&limit=400"
+                "&season={year}")
+
 
 # ---------------------------------------------------------------- fetching
 
@@ -131,44 +137,70 @@ def _request(url, headers):
         return json.load(r)
 
 
-def fetch_fpi(year):
-    """Best effort. Returns {team_id: {...}}, or {} if anything goes wrong.
+def _fpi_row(vals):
+    """Normalise one team's stat bag into the four fields the panel shows."""
+    g = lambda *keys: next((vals[k] for k in keys if vals.get(k) is not None), None)
+    return {
+        "fpi":   g("fpi"),
+        "rank":  g("fpirank", "rank", "fpi rk"),
+        "projw": g("projectedwins", "proj w", "projw"),
+        "projl": g("projectedlosses", "proj l", "projl"),
+        "sos":   g("strengthofschedulerank", "sosrank", "strengthofschedule",
+                   "sos", "sos rk"),
+    }
 
-    The core-v2 list endpoint usually answers with bare {"$ref": ...} items
-    rather than inline stats, which is why an earlier build produced empty FPI
-    for every team. Detect that and expand the refs concurrently.
-    """
+
+def _stats_from(node):
+    """Collect {lowercased stat name: value} from a categories/stats block."""
+    vals = {}
+    for cat in (node.get("categories") or []):
+        for st in (cat.get("stats") or cat.get("values") or []):
+            if isinstance(st, dict):
+                name = (st.get("name") or st.get("abbreviation")
+                        or st.get("shortDisplayName") or "").lower().strip()
+                if not name:
+                    continue
+                v = st.get("displayValue")
+                if v is None:
+                    v = st.get("value")
+                vals[name] = v
+    return vals
+
+
+def _fpi_from_core(year, diag):
     url = FPI_URL.format(year=year)
     data = None
     for label, headers in HEADER_PROFILES:
         try:
             data = _request(url, headers)
             break
-        except Exception:
-            continue
+        except Exception as e:
+            diag.append(f"core [{label}]: {type(e).__name__}")
     if not data:
-        print("  FPI unavailable - building without it", file=sys.stderr)
         return {}
 
     items = data.get("items") or []
+    diag.append(f"core returned {len(items)} items")
     if not items:
-        print("  FPI returned no items - building without it", file=sys.stderr)
         return {}
 
-    # Expand any item that is only a reference.
     refs = [i["$ref"] for i in items
             if isinstance(i, dict) and "$ref" in i and "categories" not in i]
     if refs:
         from concurrent.futures import ThreadPoolExecutor
+        errs = []
 
         def pull(u):
             try:
                 return _request(u, HEADER_PROFILES[0][1])
-            except Exception:
+            except Exception as e:
+                errs.append(type(e).__name__)
                 return None
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             items = [x for x in pool.map(pull, refs) if x]
+        diag.append(f"expanded {len(items)}/{len(refs)} refs"
+                    + (f", errors: {sorted(set(errs))[:3]}" if errs else ""))
 
     out = {}
     for item in items:
@@ -176,32 +208,141 @@ def fetch_fpi(year):
         m = re.search(r"/teams/(\d+)", ref)
         if not m:
             continue
-        vals = {}
-        for cat in item.get("categories", []):
-            for st in cat.get("stats", []):
-                name = (st.get("name") or st.get("abbreviation") or "").lower()
-                if not name:
-                    continue
-                v = st.get("displayValue")
-                if v is None:
-                    v = st.get("value")
-                vals[name] = v
+        vals = _stats_from(item)
         if vals:
-            out[m.group(1)] = {
-                "fpi":   vals.get("fpi"),
-                "rank":  vals.get("fpirank") or vals.get("rank"),
-                "projw": vals.get("projectedwins") or vals.get("proj w"),
-                "projl": vals.get("projectedlosses") or vals.get("proj l"),
-                "sos":   vals.get("strengthofschedulerank")
-                         or vals.get("strengthofschedule") or vals.get("sos"),
-            }
+            out[m.group(1)] = _fpi_row(vals)
+
+    if not out and items:
+        sample = items[0]
+        diag.append(f"first item keys: {sorted(sample.keys())[:8]}")
+        cats = sample.get("categories") or []
+        if cats:
+            diag.append(f"first category keys: {sorted(cats[0].keys())[:6]}")
+            sts = cats[0].get("stats") or cats[0].get("values") or []
+            if sts and isinstance(sts[0], dict):
+                diag.append(f"stat names: "
+                            f"{[x.get('name') for x in sts[:6]]}")
+    return out
+
+
+def _fpi_from_fitt(year, diag):
+    url = FPI_FITT_URL.format(year=year)
+    data = None
+    for label, headers in HEADER_PROFILES:
+        try:
+            data = _request(url, headers)
+            break
+        except Exception as e:
+            diag.append(f"fitt [{label}]: {type(e).__name__}")
+    if not data:
+        return {}
+
+    teams = data.get("teams") or data.get("items") or []
+    diag.append(f"fitt returned {len(teams)} teams")
+    out = {}
+    for row in teams:
+        t = row.get("team") or {}
+        tid = str(t.get("id") or "")
+        if not tid:
+            continue
+        vals = _stats_from(row)
+        if vals:
+            out[tid] = _fpi_row(vals)
+    if not out and teams:
+        diag.append(f"fitt first row keys: {sorted(teams[0].keys())[:8]}")
+    return out
+
+
+def fetch_fpi(year):
+    """Best effort. Returns {team_id: {...}}, or {} if anything goes wrong.
+
+    Two sources are tried because they fail differently: the core-v2 list often
+    answers with bare $refs that must be expanded, while the fitt endpoint the
+    FPI page itself uses returns teams already filled in. Whatever happens is
+    reported, so a run tells you which shape came back rather than leaving you
+    to guess.
+    """
+    diag = []
+    out = _fpi_from_core(year, diag)
+    if not out:
+        out = _fpi_from_fitt(year, diag)
 
     if out:
-        print(f"  FPI: {len(out)} teams", file=sys.stderr)
+        have = sum(1 for v in out.values() if v.get("fpi") is not None)
+        print(f"  FPI: {len(out)} teams, {have} with a rating", file=sys.stderr)
     else:
-        print("  FPI parsed 0 teams - field names may have changed",
-              file=sys.stderr)
+        print("  FPI unavailable - building without it", file=sys.stderr)
+    for line in diag:
+        print(f"    fpi: {line}", file=sys.stderr)
     return out
+
+
+def _projection(side):
+    """Pull a win percentage out of one side of a predictor response.
+
+    The field has been called gameProjection and teamChanceWin at different
+    times, so match on the shape of the name rather than an exact string.
+    """
+    if not isinstance(side, dict):
+        return None
+    for st in (side.get("statistics") or []):
+        name = (st.get("name") or "").lower()
+        if "projection" in name or "chancewin" in name:
+            v = st.get("displayValue")
+            if v is None:
+                v = st.get("value")
+            try:
+                return round(float(str(v).replace("%", "")), 1)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def fetch_predictor(eid):
+    """Best effort per game. Returns (away_pct, home_pct) or None."""
+    if not eid:
+        return None
+    url = PREDICTOR_URL.format(eid=eid)
+    try:
+        data = _request(url, HEADER_PROFILES[0][1])
+    except Exception:
+        return None
+
+    away = _projection(data.get("awayTeam"))
+    home = _projection(data.get("homeTeam"))
+
+    # Older/alternate shape carries plain percentages on the root object.
+    if away is None and home is None:
+        try:
+            aw = data.get("awayWinPercentage")
+            hw = data.get("homeWinPercentage")
+            if aw is not None and hw is not None:
+                away, home = round(float(aw) * 100, 1), round(float(hw) * 100, 1)
+        except (TypeError, ValueError):
+            return None
+
+    if away is None and home is None:
+        return None
+    if away is None:
+        away = round(100 - home, 1)
+    if home is None:
+        home = round(100 - away, 1)
+    return (away, home)
+
+
+def add_predictions(games, workers=8):
+    """Fetch predictors concurrently and attach them. Failures are silent."""
+    todo = [g for g in games if g.get("eid")]
+    if not todo:
+        return 0
+    from concurrent.futures import ThreadPoolExecutor
+    got = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for g, res in zip(todo, pool.map(lambda x: fetch_predictor(x["eid"]), todo)):
+            if res:
+                g["pred"] = {"away": res[0], "home": res[1]}
+                got += 1
+    return got
 
 
 def fetch(day):
