@@ -606,6 +606,7 @@ def render_week(games, day):
                     "time": " ".join(clock(g["kick"])),
                     "iso": g["kick"].isoformat(),
                     "tbd": g.get("tbd", False),
+                    "eid": g.get("eid", ""),
                     "line": g["line"],
                     "espn": g["espn"],
                     "pred": g.get("pred"),
@@ -623,6 +624,7 @@ def render_week(games, day):
             "time": t, "ap": ap,
             "iso": g["kick"].isoformat(),
             "tbd": g.get("tbd", False),
+            "eid": g.get("eid", ""),
             "badge": STREAM_BADGES.get(g["net"], "espnplus"),
             "net": g["net"] or "Streaming",
             "conf": f'|{g["away"]["conf"]}|{g["home"]["conf"]}|',
@@ -633,6 +635,9 @@ def render_week(games, day):
         })
 
     payload["saturday"] = day.isoformat()
+    # The client fetches live scores for this exact date. Kept as YYYYMMDD so
+    # the browser never has to reformat it.
+    payload["ymd"] = day.strftime("%Y%m%d")
     return payload
 
 

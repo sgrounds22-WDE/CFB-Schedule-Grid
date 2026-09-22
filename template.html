@@ -197,6 +197,57 @@
   .game.dim{opacity:.13}
   .game.hit{outline:2px solid var(--accent);outline-offset:1px}
 
+  /* ---- live scores ----
+     Scores sit at the inner edge of each half so they flank the @ badge and
+     read as "Ohio State 21 @ 17 Texas". The status cap reuses the slot the
+     kickoff time used to occupy, and only appears once a game has started. */
+  .game .sc{
+    font-family:"Barlow",sans-serif;font-size:13px;font-weight:700;
+    font-variant-numeric:tabular-nums;flex:0 0 auto;padding:0 4px;opacity:.7;
+  }
+  .game .sc:empty{display:none}
+  .game .t.l .sc{margin-left:auto}
+  .game .t.r .sc{margin-right:auto}
+  .game .sc.lead{opacity:1}
+  /* The badge carries the period while a game is being played. It straddles
+     the seam, so the room it needs is shared between the two teams rather than
+     taken from the home side alone - which is where names were being cut when
+     this was a right-hand cap.
+
+     Once a game is over the badge goes back to "@" and the whole bar recedes.
+     Muted plus a score already says "this is finished", so spelling out FINAL
+     would be saying it twice. */
+  .game.hasq .at{
+    width:auto;min-width:16px;height:17px;border-radius:9px;padding:0 5px;
+    font-size:8.5px;letter-spacing:.02em;
+  }
+  .game.hasq .t.l{padding-right:20px}
+  .game.hasq .t.r{padding-left:20px}
+  .game.islive .at{background:#e8112d;color:#fff}
+  .game.isot   .at{background:#ffb020;color:#10233d}
+  /* Finished games step back so the live ones carry the grid. :not(.dim)
+     keeps the conference filter's own fade from being overridden. */
+  .game.isdone:not(.dim){opacity:.55}
+
+  @media (prefers-reduced-motion:no-preference){
+    .game.islive .at{animation:livering 2.6s ease-out infinite}
+  }
+  @keyframes livering{
+    0%   {box-shadow:0 0 0 2.5px var(--board-bg), 0 0 0 0 rgba(232,17,45,.5)}
+    70%  {box-shadow:0 0 0 2.5px var(--board-bg), 0 0 0 5px rgba(232,17,45,0)}
+    100% {box-shadow:0 0 0 2.5px var(--board-bg), 0 0 0 0 rgba(232,17,45,0)}
+  }
+
+  .srow .sc{
+    font-family:"Barlow",sans-serif;font-size:11.5px;font-weight:700;
+    font-variant-numeric:tabular-nums;flex:0 0 auto;color:var(--ink);
+  }
+  .srow .sc:empty{display:none}
+
+  .livestamp{display:inline-flex;align-items:center;gap:5px;color:var(--accent)}
+  .livestamp:empty{display:none}
+  .livestamp.err{color:var(--ink-dim)}
+
   /* ---- detail panel ---- */
   .sheet{
     position:fixed;inset:0;z-index:60;display:none;
@@ -220,6 +271,30 @@
   }
   .card .teams,
   .card .tabs,
+  /* Live score in the panel. The bar carries the numbers only, so this is the
+     one place the clock, the quarter and "final" actually appear. */
+  .card .lscore{
+    display:flex;align-items:center;gap:12px;padding:14px 16px 6px;
+  }
+  .card .lscore .ls{
+    flex:1;font-family:"Barlow Condensed",sans-serif;font-size:34px;
+    font-weight:700;line-height:1;font-variant-numeric:tabular-nums;opacity:.45;
+  }
+  .card .lscore .ls.a{text-align:right}
+  .card .lscore .ls.b{text-align:left}
+  .card .lscore .ls.lead{opacity:1}
+  .card .lscore .lst{
+    flex:0 0 auto;font-family:"Barlow",sans-serif;font-size:10px;font-weight:700;
+    letter-spacing:.09em;text-transform:uppercase;text-align:center;
+    color:var(--ink-dim);white-space:nowrap;
+    border:1px solid var(--board-line-strong);border-radius:999px;padding:4px 10px;
+  }
+  .card .lscore .lst.on{color:#fff;background:#c8102e;border-color:#c8102e}
+  @media (max-height:520px){
+    .card .lscore{padding:9px 14px 3px}
+    .card .lscore .ls{font-size:26px}
+  }
+
   .card .bar{flex:0 0 auto}
   .card .teams{display:flex}
   .card .tm{
@@ -288,7 +363,31 @@
     .pred .track{height:18px}
     .pred .src{padding:5px 0 0}
     .espn{margin:2px 14px 9px;padding:7px 12px}
-    .card .bar{padding:7px 14px}
+    /* Live score in the panel. The bar carries the numbers only, so this is the
+     one place the clock, the quarter and "final" actually appear. */
+  .card .lscore{
+    display:flex;align-items:center;gap:12px;padding:14px 16px 6px;
+  }
+  .card .lscore .ls{
+    flex:1;font-family:"Barlow Condensed",sans-serif;font-size:34px;
+    font-weight:700;line-height:1;font-variant-numeric:tabular-nums;opacity:.45;
+  }
+  .card .lscore .ls.a{text-align:right}
+  .card .lscore .ls.b{text-align:left}
+  .card .lscore .ls.lead{opacity:1}
+  .card .lscore .lst{
+    flex:0 0 auto;font-family:"Barlow",sans-serif;font-size:10px;font-weight:700;
+    letter-spacing:.09em;text-transform:uppercase;text-align:center;
+    color:var(--ink-dim);white-space:nowrap;
+    border:1px solid var(--board-line-strong);border-radius:999px;padding:4px 10px;
+  }
+  .card .lscore .lst.on{color:#fff;background:#c8102e;border-color:#c8102e}
+  @media (max-height:520px){
+    .card .lscore{padding:9px 14px 3px}
+    .card .lscore .ls{font-size:26px}
+  }
+
+  .card .bar{padding:7px 14px}
     .card .bar b{font-size:15px}
     .card .bar button{padding:4px 11px}
   }
@@ -369,6 +468,30 @@
   }
   .espn:hover{background:#e01236}
   .espn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* Live score in the panel. The bar carries the numbers only, so this is the
+     one place the clock, the quarter and "final" actually appear. */
+  .card .lscore{
+    display:flex;align-items:center;gap:12px;padding:14px 16px 6px;
+  }
+  .card .lscore .ls{
+    flex:1;font-family:"Barlow Condensed",sans-serif;font-size:34px;
+    font-weight:700;line-height:1;font-variant-numeric:tabular-nums;opacity:.45;
+  }
+  .card .lscore .ls.a{text-align:right}
+  .card .lscore .ls.b{text-align:left}
+  .card .lscore .ls.lead{opacity:1}
+  .card .lscore .lst{
+    flex:0 0 auto;font-family:"Barlow",sans-serif;font-size:10px;font-weight:700;
+    letter-spacing:.09em;text-transform:uppercase;text-align:center;
+    color:var(--ink-dim);white-space:nowrap;
+    border:1px solid var(--board-line-strong);border-radius:999px;padding:4px 10px;
+  }
+  .card .lscore .lst.on{color:#fff;background:#c8102e;border-color:#c8102e}
+  @media (max-height:520px){
+    .card .lscore{padding:9px 14px 3px}
+    .card .lscore .ls{font-size:26px}
+  }
 
   .card .bar{
     display:flex;align-items:center;justify-content:space-between;
@@ -623,6 +746,8 @@ try { conf = localStorage.getItem("cfb.conf") || "ALL"; } catch (e) {}
 
 /* ---- build-time stamp, so a failed rebuild is visible ---- */
 const stampEl = document.getElementById("stamp");
+const liveStampEl = document.createElement("span");
+liveStampEl.className = "livestamp";
 
 function drawStamp(){
   const t = new Date(DOC.generated);
@@ -657,6 +782,7 @@ function drawStamp(){
     s.textContent = "\u00b7  times in " + zoneLabel();
     stampEl.append(s);
   }
+  stampEl.append(liveStampEl);
 }
 drawStamp();
 
@@ -736,12 +862,13 @@ function drawWeek(W){
       el.dataset.teams = (g.away.name + " " + g.home.name).toLowerCase();
       el.setAttribute("aria-label",
         `${g.away.name} at ${g.home.name}, ${fmtTime(g.iso).join(" ")} on ${r.net}`);
+      if (g.eid) el.dataset.eid = g.eid;
       el.innerHTML =
         `<span class="t l" style="background:${g.away.colour};color:${g.away_ink}">
-           ${g.away.rank ? `<span class="rk">#${g.away.rank}</span>` : ""}<span class="nm">${esc(g.away.name)}</span>
+           ${g.away.rank ? `<span class="rk">#${g.away.rank}</span>` : ""}<span class="nm">${esc(g.away.name)}</span><span class="sc"></span>
          </span>
          <span class="t r" style="background:${g.home.colour};color:${g.home_ink}">
-           <span class="nm">${esc(g.home.name)}</span>${g.home.rank ? `<span class="rk">#${g.home.rank}</span>` : ""}
+           <span class="sc"></span><span class="nm">${esc(g.home.name)}</span>${g.home.rank ? `<span class="rk">#${g.home.rank}</span>` : ""}
          </span>
          <span class="at">@</span>`;
       el.addEventListener("click", () => openSheet(g, r.net));
@@ -751,10 +878,12 @@ function drawWeek(W){
   }
 
   streamEl.innerHTML = W.stream.map(s =>
-    `<div class="srow" data-conf="${s.conf}" data-teams="${esc(s.match.toLowerCase())}">
+    `<div class="srow" data-conf="${s.conf}" data-teams="${esc(s.match.toLowerCase())}"${
+        s.eid ? ` data-eid="${s.eid}"` : ""}>
        <span class="t${s.tbd ? " tbd" : ""}">${s.tbd ? "TBD" : esc(fmtTime(s.iso)[0])}</span>
        <span class="b ${s.badge}">${esc(s.net)}</span>
        <span class="m">${esc(s.match)}</span>
+       <span class="sc"></span>
      </div>`).join("");
 
   /* Chips are per-week: a conference with no games this Saturday should not
@@ -771,6 +900,7 @@ function drawWeek(W){
     bar.appendChild(b);
   }
   apply();
+  startLive();
 }
 
 let query = "";
@@ -784,6 +914,178 @@ function applyFilter(key){
 /* Conference and search combine: a game must satisfy both. Search matches are
    outlined as well as kept, so with a broad conference selected you can still
    see where your team sits rather than losing the surrounding context. */
+
+/* ================= live scores =================================
+   The only part of this page that touches the network. Everything else is
+   baked in at build time, so if any of this fails the page is exactly what it
+   was before: a correct schedule with no scores.
+
+   Host matters. site.api.espn.com answers scripts but refuses browsers, while
+   site.web.api.espn.com is the host ESPN's own front end calls and returns
+   access-control-allow-origin: *, so a page can read it directly with no
+   proxy in between. */
+const LIVE_HOST = "https://site.web.api.espn.com/apis/site/v2/sports/" +
+                  "football/college-football/scoreboard";
+const LIVE = new Map();          // event id -> {a, h, state, detail}
+let liveTimer = null, liveFails = 0, liveAt = null;
+
+/* Today's date in Eastern. The build keys each week by its ET date, so the
+   comparison has to be made in the same zone no matter where the viewer is. */
+function etYMD(d){
+  const p = new Intl.DateTimeFormat("en-US", {
+    timeZone: ET_ZONE, year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(d);
+  const g = t => (p.find(x => x.type === t) || {}).value;
+  return `${g("year")}${g("month")}${g("day")}`;
+}
+
+/* Only the current slate is worth fetching. Yesterday counts because a late
+   kickoff finishes after midnight Eastern, and someone looking on Sunday
+   morning still wants the final. */
+function weekIsCurrent(W){
+  if (!W || !W.ymd) return false;
+  const now = Date.now();
+  return W.ymd === etYMD(new Date(now)) || W.ymd === etYMD(new Date(now - 864e5));
+}
+
+function ingest(data){
+  for (const ev of (data.events || [])){
+    const comp  = (ev.competitions || [])[0] || {};
+    const st    = comp.status || ev.status || {};
+    const ty    = st.type || {};
+    const score = {};
+    for (const c of (comp.competitors || [])){
+      if (c.homeAway) score[c.homeAway] = c.score;
+    }
+    LIVE.set(String(ev.id), {
+      a: score.away, h: score.home,
+      state: ty.state || "pre",
+      detail: ty.shortDetail || ty.detail || ty.description || "",
+      period: Number(st.period) || 0,
+      // STATUS_POSTPONED / STATUS_CANCELED arrive as state "post" with a 0-0
+      // score, which would otherwise render as a real final.
+      off: /POSTPONED|CANCELED|CANCELLED|SUSPENDED/i.test(ty.name || ""),
+    });
+  }
+}
+
+/* ESPN writes in-progress detail as "Q3 - 4:22" and finals as "Final/OT".
+   Both are fine once the separator is dropped and the case is normalised. */
+function statusLabel(s){
+  if (s.state === "pre") return "";
+  const t = String(s.detail).replace(/\s+-\s+/g, " ").trim();
+  return t.slice(0, 14).toUpperCase();
+}
+
+/* What the badge shows while a game is being played. Finished and upcoming
+   games both fall through to "@" - the mute and the score already say which. */
+function periodLabel(s){
+  if (!s || s.state !== "in" || s.off) return "";
+  const d = String(s.detail).toLowerCase();
+  if (d.includes("half")) return "HALF";
+  if (d.includes("delay")) return "DELAY";
+  const p = s.period;
+  if (!p) return "LIVE";
+  if (p > 4) return p === 5 ? "OT" : (p - 4) + "OT";
+  return "Q" + p;
+}
+
+function paintLive(){
+  document.querySelectorAll(".game[data-eid]").forEach(el => {
+    const s  = LIVE.get(el.dataset.eid);
+    const aE = el.querySelector(".t.l .sc");
+    const hE = el.querySelector(".t.r .sc");
+    if (!aE || !hE) return;
+
+    const badge = el.querySelector(".at");
+
+    if (!s || s.state === "pre" || s.off){
+      aE.textContent = hE.textContent = "";
+      if (badge) badge.textContent = "@";
+      el.classList.remove("islive", "isot", "isdone", "hasq");
+      return;
+    }
+    aE.textContent = s.a == null ? "" : String(s.a);
+    hE.textContent = s.h == null ? "" : String(s.h);
+
+    const a = Number(s.a), h = Number(s.h);
+    aE.classList.toggle("lead", Number.isFinite(a) && Number.isFinite(h) && a > h);
+    hE.classList.toggle("lead", Number.isFinite(a) && Number.isFinite(h) && h > a);
+
+    const q = periodLabel(s);
+    if (badge) badge.textContent = q || "@";
+    el.classList.toggle("hasq",   !!q);
+    el.classList.toggle("islive", s.state === "in" && s.period <= 4);
+    el.classList.toggle("isot",   s.state === "in" && s.period > 4);
+    el.classList.toggle("isdone", s.state === "post");
+
+    // A screen reader cannot see the badge colour, so put it in the label.
+    const base = el.dataset.label || el.getAttribute("aria-label") || "";
+    if (!el.dataset.label) el.dataset.label = base;
+    el.setAttribute("aria-label",
+      `${el.dataset.label}. ${statusLabel(s)}, ${s.a}\u2013${s.h}`);
+  });
+
+  document.querySelectorAll(".srow[data-eid]").forEach(r => {
+    const s = LIVE.get(r.dataset.eid);
+    const e = r.querySelector(".sc");
+    if (e) e.textContent = (s && s.state !== "pre" && s.a != null)
+      ? `${s.a}\u2013${s.h}` : "";
+  });
+
+  paintLiveStamp();
+}
+
+function paintLiveStamp(){
+  if (liveFails >= 3){
+    liveStampEl.className = "livestamp err";
+    liveStampEl.textContent = "\u00b7  scores unavailable";
+    return;
+  }
+  if (!liveAt){ liveStampEl.textContent = ""; return; }
+  const anyLive = [...LIVE.values()].some(v => v.state === "in");
+  liveStampEl.className = "livestamp";
+  liveStampEl.textContent = "\u00b7  scores "
+    + (anyLive ? "live" : "final")
+    + " as of " + new Intl.DateTimeFormat("en-US",
+        {hour: "numeric", minute: "2-digit"}).format(liveAt);
+}
+
+function scheduleLive(){
+  clearTimeout(liveTimer);
+  if (document.hidden || liveFails >= 3) return;
+  if (!weekIsCurrent(DOC.weeks[weekIdx])) return;
+
+  const vals = [...LIVE.values()];
+  const anyLive = vals.some(v => v.state === "in");
+  // Once every game on the slate is over there is nothing left to poll for.
+  if (vals.length && !anyLive && vals.every(v => v.state === "post")) return;
+  liveTimer = setTimeout(pollLive, anyLive ? 30000 : 120000);
+}
+
+function pollLive(){
+  const W = DOC.weeks[weekIdx];
+  if (!weekIsCurrent(W)) return;
+
+  fetch(`${LIVE_HOST}?dates=${W.ymd}&groups=80&limit=400`, {cache: "no-store"})
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(d => { ingest(d); liveFails = 0; liveAt = new Date(); })
+    .catch(() => { liveFails++; })
+    .finally(() => { paintLive(); scheduleLive(); });
+}
+
+function startLive(){
+  clearTimeout(liveTimer);
+  paintLive();                       // repaint from cache on a week switch
+  if (weekIsCurrent(DOC.weeks[weekIdx])) pollLive();
+}
+
+// A background tab should not keep polling; catch up when it comes forward.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearTimeout(liveTimer);
+  else startLive();
+});
+
 const sheet = document.getElementById("sheet");
 const card  = document.getElementById("card");
 let lastFocus = null;
@@ -828,6 +1130,26 @@ function openSheet(g, net){
          <span class="lab">${label}</span>
          <span class="v b">${hv || "&mdash;"}</span></div>`
     : "";
+
+  /* Live score, when there is one. Sits above the predictor because once a
+     game is under way the actual score matters more than the forecast. */
+  let livebox = "";
+  const lv = g.eid ? LIVE.get(String(g.eid)) : null;
+  if (lv && lv.off){
+    livebox = `
+      <div class="lscore">
+        <span class="lst" style="flex:1">${esc(statusLabel(lv) || "Not played")}</span>
+      </div>`;
+  } else if (lv && lv.state !== "pre" && lv.a != null){
+    const an = Number(lv.a), hn = Number(lv.h);
+    const label = statusLabel(lv);
+    livebox = `
+      <div class="lscore">
+        <span class="ls a${an > hn ? " lead" : ""}">${esc(lv.a)}</span>
+        <span class="lst${lv.state === "in" ? " on" : ""}">${esc(label)}</span>
+        <span class="ls b${hn > an ? " lead" : ""}">${esc(lv.h)}</span>
+      </div>`;
+  }
 
   /* Matchup predictor as a split track rather than ESPN's donut — a bar reads
      faster at this size and shows the margin between the two directly. */
@@ -892,6 +1214,7 @@ function openSheet(g, net){
       <button type="button" role="tab" aria-selected="false" data-pane="teams">Teams</button>
     </div>
     <div class="pane on" data-pane="game">
+      ${livebox}
       ${predictor}
       <div class="rows">
         ${row("Network", esc(net))}
