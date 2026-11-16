@@ -253,3 +253,5 @@ Everything worth changing sits at the top of two files.
 Command line:
 - `--weeks N` — how many Saturdays to bake in.
 - `--date YYYY-MM-DD` — build a specific week.
+
+- 
